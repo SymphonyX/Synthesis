@@ -3,6 +3,47 @@ import math
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 
+def quadraticFunc(x):
+    out = list()
+    for d in x:
+        out.append((-d**2))
+    return  out
+
+def generate_example(time=1.0):
+    train = open("train.txt", "r")
+    lines = train.readlines()
+    del lines[0]
+    trajectory = list()
+    for line in lines:
+        line = line.split("\n")[0]
+        line = line.split(",")
+        trajectory.append( ( float(line[0]), float(line[1]) ) )
+
+    trajectory = sorted(trajectory, key=lambda x: x[0])
+    demonstration = [pos[1] for pos in trajectory]
+
+    #Other test
+    demonstration = quadraticFunc(np.linspace(-4,4.0, num=100))
+
+    velocities = np.zeros( (len(demonstration), 1) )
+    accelerations = np.zeros( (len(demonstration), 1) )
+
+    times = np.linspace(0, time, num=len(demonstration))
+
+
+    for i in range(1,len(demonstration)):
+        dx = demonstration[i] - demonstration[i-1]
+        dt = times[i] - times[i-1]
+
+        velocities[i] = dx / (dt / time) - velocities[i-1]
+        accelerations[i] = (velocities[i] - velocities[i-1]) / dt
+
+    velocities[0] = velocities[1] - (velocities[2] - velocities[1])
+    accelerations[0] = accelerations[1] - (accelerations[2] - accelerations[1])
+
+    return demonstration, velocities, accelerations, times
+
+
 class DMP:
 
     def __init__(self, num_basis, K, D, start, goal):
@@ -26,21 +67,19 @@ class DMP:
     def _gaussians(self, s):
         return np.exp( np.multiply(-1 / (2*(self.sigmas)**2), np.square(s - self.mus) ) )
 
-    def acceleration(self, s):
+    def _acceleration(self, s):
         #Original
         #return (self.K * (self.goal - self.pos)) - (self.D * self.vel) + ((self.goal - self.start) * self._forcing_term(s))
         #Newer
         return (self.K * (self.goal - self.pos)) - (self.D * self.vel) - (self.K * (self.goal - self.start) * s) + (self.K * self._forcing_term(s))
 
     def _forcing_term(self, s):
-        sum_basis = 0
-        sum_basis_weight = 0
         gaussian = self._gaussians(s)
-        for i in range(self.weights.shape[0]):
-            sum_basis_weight += self.weights[i] * gaussian[i] * s
-            sum_basis += gaussian[i]
+        s_gaussians = gaussian * s
+        sum_basis_weight = np.transpose(self.weights).dot(s_gaussians)
+        sum_basis = np.sum(gaussian)
 
-        return (sum_basis_weight[0] / sum_basis[0]) * s
+        return (sum_basis_weight[0][0] / sum_basis)
 
     def _f_target(self, s, tau=1.0):
         #Original
@@ -54,36 +93,6 @@ class DMP:
         # the solution has the form given below: s(t) = c * e^(-(alpha*t)/tau)
         return math.exp(- (alpha * t) / tau )
 
-    def compute_error(self, positions, velocities, accelerations, times):
-        error = 0
-        for i in range(len(velocities)):
-            self.vel = velocities[i][0]
-            self.acc = accelerations[i][0]
-            self.pos = positions[i]
-            t = times[i]
-            s = self.solve_canonical_system(t)
-            error += ( self._f_target(s) - self._forcing_term(s) )**2
-        return error
-
-
-    def find_best_alpha(self, alpha_decay, sum_grad, weights, positions, velocities, accelerations, times):
-        error = float("inf")
-        alpha_error = float("inf")
-        prev_alpha_error = 0
-        alpha_iter = 0
-        while prev_alpha_error - alpha_error > 0.01 or alpha_error == float("inf"):
-            alpha = alpha_decay**alpha_iter
-            self.weights = weights - (alpha * sum_grad)
-            prev_alpha_error = alpha_error
-
-            alpha_error = self.compute_error(positions, velocities, accelerations, times)
-
-            if alpha_error < error: error = alpha_error
-
-            alpha_iter += 1
-
-        return alpha_decay**(alpha_iter-1), error
-
     def find_weights(self, Amat, fvec):
 
         At = np.transpose(Amat)
@@ -91,28 +100,107 @@ class DMP:
         weights = np.linalg.inv(At_dotA).dot(At).dot(fvec)
         return weights
 
+    def _offset_goal(self):
+        if (self.start == self.goal):
+            self.goal += 1e-4
 
 
+    def learn_dmp(self, times, positions, velocities, accelerations):
 
-    def train_dmp(self, times, positions, velocities, accelerations, learning_rate, decay):
+        self._offset_goal()
 
-        error = float("inf")
-        previous_error = 0
-        iteration = 0
-        while  iteration < 1000 or (previous_error - error) >  0.000001:
+        subdivide = 10
 
-            sum_grad = 0.0
-            sum_new_weights = 0.0
-            fvec = np.zeros( (len(velocities), 1) )
-            Amat = np.zeros( (len(velocities), self.weights.shape[0]) )
+        Amat = np.zeros( (len(times)*subdivide, self.weights.shape[0] ) )
+        fvec = np.zeros( (len(times)*subdivide, 1) )
 
-            for i in range(len(velocities)):
-                self.vel = velocities[i][0]
-                self.acc = accelerations[i][0]
-                self.pos = positions[i]
-                t = times[i]
+        for i in range(len(times)-1):
+            time = times[i]
+            dt = (times[i+1] - times[i]) / subdivide
+            pos = positions[i]
 
+
+            for j in range(subdivide):
+                t = time + (dt * j) 
                 s = self.solve_canonical_system(t)
-                gaussians = self._gaussians(s)
 
-                Am
+                gauss = self._gaussians(s)
+                gauss = (gauss * s) / np.sum(gauss)
+
+                Amat[(i * subdivide) + j] = np.transpose(gauss)
+                fvec[(i * subdivide) + j] = self._f_target(s)
+
+                delta_pos = ((positions[i+1] - pos) / subdivide)
+                new_vel = delta_pos / dt
+                new_acc = (new_vel - self.vel) / dt
+
+                self.pos += delta_pos
+                self.vel = new_vel
+                self.acc = new_acc
+
+        self.weights = self.find_weights(Amat, fvec)
+
+    def _reset(self, start, goal):
+        self.start = start
+        self.goal = goal
+        self.pos = start
+        self.vel = 0
+        self.acc = 0
+
+    def run_dmp(self, tau, dt, start, goal):
+        self._reset(start, goal)
+        timesteps = int(tau / dt)
+
+        x = np.zeros( (timesteps, 1) )
+        xdot = np.zeros( (timesteps, 1) )
+        xddot = np.zeros( (timesteps, 1) )
+        times = np.zeros( (timesteps, 1) )
+
+        t = 0
+        for i in range(timesteps):
+            s = self.solve_canonical_system(t)
+
+            self.acc = self._acceleration(s)
+            self.vel += (self.acc * t) / tau
+            self.pos += (self.vel * t) / tau
+
+            x[i] = self.pos
+            xdot[i] = self.vel
+            xddot[i] = self.acc
+            times[i] = t
+
+            t += dt
+
+        return x, xdot, xddot, times
+
+
+if __name__ == '__main__':
+    K = 25.0
+    D = K / 4
+    basis = 10
+
+    demonstration, velocities, accelerations, times = generate_example()
+
+    dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
+    dmp.learn_dmp(times, demonstration, velocities, accelerations)
+
+    tau = 1.0
+    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
+
+    print x
+    plt.plot(t, x, c="b")
+    plt.plot(times, demonstration, c="r")
+    #
+    # gauss = np.zeros( (basis, len(times)) )
+    # ss = np.zeros( (len(times), 1) )
+    # for i, t in enumerate(times):
+    #     s = dmp.solve_canonical_system(t)
+    #     for j in range(basis):
+    #         gauss[j][i] = dmp._gaussians(s)[j]
+    #     ss[i] = s
+    #
+    # for i in range(basis):
+    #     plt.scatter(ss, gauss[i])
+
+
+    plt.show()
