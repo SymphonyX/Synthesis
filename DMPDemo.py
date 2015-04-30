@@ -1,6 +1,7 @@
 from dmp import DMP
-
+import numpy as np
 import matplotlib.pyplot as plt
+from RosbagReader import Reader
 
 def quadraticFunc(x):
     out = list()
@@ -24,8 +25,11 @@ def generate_example(time=1.0):
     #demonstration = quadraticFunc(np.linspace(-4,4.0, num=100))
     #demonstration = np.sin(np.arange(0,time,.01)*5)
 
+    return diff_demonstration(demonstration, time)
 
-    velocities = np.zeros( (len(demonstration), 1) )
+    
+def diff_demonstration(demonstration, time):
+	velocities = np.zeros( (len(demonstration), 1) )
     accelerations = np.zeros( (len(demonstration), 1) )
 
     times = np.linspace(0, time, num=len(demonstration))
@@ -44,14 +48,19 @@ def generate_example(time=1.0):
     return demonstration, velocities, accelerations, times
 
 
-
 if __name__ == '__main__':
     K = 200.0
     D = K / 4
-    basis = 60
+    basis = 10
+
+    ubot_joint_traj, times = Reader.jointPositions("idontknow.bag")
+    ubot_joint_vel, times = Reader.jointVelocities("idontknow.bag")
+    ubot_joint_torques, times = Reader.jointTorques("idontknow.bag")
 
     t_demonstration = 1.0
-    demonstration, velocities, accelerations, times = generate_example(t_demonstration)
+    #demonstration, velocities, accelerations, times = generate_example(t_demonstration)
+    demonstration, velocities, accelerations, times = diff_demonstration(demonstration, t_demonstration)
+
 
     dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
     dmp.learn_dmp(times, demonstration, velocities, accelerations)
