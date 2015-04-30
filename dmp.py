@@ -179,7 +179,7 @@ class DMP:
 if __name__ == '__main__':
     K = 200.0
     D = K / 4
-    basis = 30
+    basis = 60
 
     t_demonstration = 1.0
     demonstration, velocities, accelerations, times = generate_example(t_demonstration)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     dmp.learn_dmp(times, demonstration, velocities, accelerations)
 
     tau = 1.0
-    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1]-5)
+    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0]+5, demonstration[-1])
 
     plt.plot(t, x, c="b")
     plt.plot(times, demonstration, c="r")
