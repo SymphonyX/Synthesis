@@ -23,7 +23,9 @@ def generate_example(time=1.0):
     demonstration = [pos[1] for pos in trajectory]
 
     #Other test
-    demonstration = quadraticFunc(np.linspace(-4,4.0, num=100))
+    #demonstration = quadraticFunc(np.linspace(-4,4.0, num=100))
+    demonstration = np.sin(np.arange(0,time,.01)*5)
+
 
     velocities = np.zeros( (len(demonstration), 1) )
     accelerations = np.zeros( (len(demonstration), 1) )
@@ -35,7 +37,7 @@ def generate_example(time=1.0):
         dx = demonstration[i] - demonstration[i-1]
         dt = times[i] - times[i-1]
 
-        velocities[i] = dx / (dt / time) - velocities[i-1]
+        velocities[i] = dx / dt
         accelerations[i] = (velocities[i] - velocities[i-1]) / dt
 
     velocities[0] = velocities[1] - (velocities[2] - velocities[1])
@@ -88,7 +90,7 @@ class DMP:
         return (((tau * self.acc) + (self.D * self.vel)) / self.K) - (self.goal - self.pos) + ((self.goal - self.start) * s)
 
 
-    def solve_canonical_system(self, t, tau=1.0, alpha = -math.log(0.01)):
+    def solve_canonical_system(self, t, tau=1.0, alpha = -math.log(0.05)):
         # tau * s' = -alpha * s: s depends on time, so this diffeq is actually a function of time.
         # the solution has the form given below: s(t) = c * e^(-(alpha*t)/tau)
         return math.exp(- (alpha * t) / tau )
@@ -158,16 +160,17 @@ class DMP:
 
         t = 0
         for i in range(timesteps):
-            s = self.solve_canonical_system(t)
-
-            self.acc = self._acceleration(s)
-            self.vel += (self.acc * t) / tau
-            self.pos += (self.vel * t) / tau
-
             x[i] = self.pos
             xdot[i] = self.vel
             xddot[i] = self.acc
             times[i] = t
+
+            s = self.solve_canonical_system(t)
+
+            self.acc = self._acceleration(s)
+            self.vel += (self.acc * dt) / tau
+            self.pos += (self.vel * dt) / tau
+
 
             t += dt
 
@@ -175,9 +178,9 @@ class DMP:
 
 
 if __name__ == '__main__':
-    K = 25.0
+    K = 700.0
     D = K / 4
-    basis = 10
+    basis = 20
 
     demonstration, velocities, accelerations, times = generate_example()
 
@@ -190,7 +193,7 @@ if __name__ == '__main__':
     print x
     plt.plot(t, x, c="b")
     plt.plot(times, demonstration, c="r")
-    #
+    
     # gauss = np.zeros( (basis, len(times)) )
     # ss = np.zeros( (len(times), 1) )
     # for i, t in enumerate(times):
@@ -198,7 +201,7 @@ if __name__ == '__main__':
     #     for j in range(basis):
     #         gauss[j][i] = dmp._gaussians(s)[j]
     #     ss[i] = s
-    #
+    
     # for i in range(basis):
     #     plt.scatter(ss, gauss[i])
 
