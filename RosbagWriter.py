@@ -19,7 +19,7 @@ class Writer:
         bag = rosbag.Bag(bagname, "w")
         rostopic = "/uBot/joint_positions"
 
-        for i in range(len(values.shape[0])):
+        for i in range(values.shape[0]):
             joint_pos = JointPositions()
 
             joint_pos.numJoints = len(values[i])
