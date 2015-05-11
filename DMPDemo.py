@@ -2,6 +2,7 @@ from dmp import DMP
 import numpy as np
 import matplotlib.pyplot as plt
 from RosbagReader import Reader
+from RosbagWriter import Writer
 
 def quadraticFunc(x):
     out = list()
@@ -29,7 +30,7 @@ def generate_example(time=1.0):
 
     
 def diff_demonstration(demonstration, time):
-	velocities = np.zeros( (len(demonstration), 1) )
+    velocities = np.zeros( (len(demonstration), 1) )
     accelerations = np.zeros( (len(demonstration), 1) )
 
     times = np.linspace(0, time, num=len(demonstration))
@@ -49,24 +50,38 @@ def diff_demonstration(demonstration, time):
 
 
 if __name__ == '__main__':
-    K = 200.0
-    D = K / 4
-    basis = 10
+    K = 1000.0
+    D = 40.0
+    basis = 50
 
     ubot_joint_traj, times = Reader.jointPositions("idontknow.bag")
-    ubot_joint_vel, times = Reader.jointVelocities("idontknow.bag")
-    ubot_joint_torques, times = Reader.jointTorques("idontknow.bag")
-
-    t_demonstration = 1.0
+    #ubot_joint_vel, times = Reader.jointVelocities("idontknow.bag")
+    #ubot_joint_torques, times = Reader.jointTorques("idontknow.bag")
+  
+    t_demonstration = times[-1] - times[0]
     #demonstration, velocities, accelerations, times = generate_example(t_demonstration)
-    demonstration, velocities, accelerations, times = diff_demonstration(demonstration, t_demonstration)
+    all_trajectories = np.zeros( (len(ubot_joint_traj), len(ubot_joint_traj[0])) )
+    timesteps = list()
+    for i, trajectory in enumerate(ubot_joint_traj):
+        demonstration, velocities, accelerations, times = diff_demonstration(trajectory, t_demonstration)
+        all_trajectories[i] = np.asarray(demonstration)
+        timesteps = times
+
+    trajectoriesT = np.transpose(all_trajectories)
+
+    
+    Writer.writePositions("idontknow_pos.bag", trajectoriesT, timesteps)
+
+
+    shoulder1_traj = [traj[Reader.JH_SHOULDER1] for traj in ubot_joint_traj]
+    demonstration, velocities, accelerations, times = diff_demonstration(shoulder1_traj, t_demonstration)
 
 
     dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
     dmp.learn_dmp(times, demonstration, velocities, accelerations)
 
-    tau = 1.0
-    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0]+5, demonstration[-1])
+    tau = times[-1] - times[0]
+    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
 
     plt.plot(t, x, c="b")
     plt.plot(times, demonstration, c="r")
