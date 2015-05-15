@@ -23,10 +23,19 @@ class Writer:
             joint_pos = JointPositions()
 
             joint_pos.numJoints = len(values[i])
-            joint_pos.JointPositions = values[i]
-            joint_pos.stamp = times[i]
+            joint_pos.positions = values[i]
 
-            bag.write(rostopic, joint_pos)
+            secs = int(times[i])
+            nsecs = ((times[i] - secs) * 1000) * 1000000
+            print "Seconds: ", secs
+            print "Nano secs: ", nsecs
+
+            # time = Time()
+            # time.sec = secs
+            # time.nsec = nsecs
+            # joint_pos.stamp = time
+
+            # bag.write(rostopic, joint_pos)
 
 
 

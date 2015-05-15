@@ -60,17 +60,19 @@ if __name__ == '__main__':
   
     t_demonstration = times[-1] - times[0]
     #demonstration, velocities, accelerations, times = generate_example(t_demonstration)
+
     all_trajectories = np.zeros( (len(ubot_joint_traj), len(ubot_joint_traj[0])) )
     timesteps = list()
-    for i, trajectory in enumerate(ubot_joint_traj):
+    for joint_index in range(len(ubot_joint_traj[0])):
+        trajectory = [pos[joint_index] for pos in ubot_joint_traj]
+
         demonstration, velocities, accelerations, times = diff_demonstration(trajectory, t_demonstration)
-        all_trajectories[i] = np.asarray(demonstration)
+        demons_vec = np.asarray(demonstration)
+        
+        all_trajectories[:,joint_index] = demons_vec
         timesteps = times
 
-    trajectoriesT = np.transpose(all_trajectories)
-
-    
-    Writer.writePositions("idontknow_pos.bag", trajectoriesT, timesteps)
+    Writer.writePositions("idontknow_pos.bag", all_trajectories, timesteps)
 
 
     shoulder1_traj = [traj[Reader.JH_SHOULDER1] for traj in ubot_joint_traj]
