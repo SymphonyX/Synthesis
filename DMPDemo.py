@@ -48,6 +48,10 @@ def diff_demonstration(demonstration, time):
 
     return demonstration, velocities, accelerations, times
 
+def plotDMP(t_demo, x_demo, t_dmp, x_dmp):
+    plt.plot(t_dmp, x_dmp, c="b")
+    plt.plot(t_demo, x_demo, c="r")
+    plt.show()
 
 if __name__ == '__main__':
     K = 1000.0
@@ -61,32 +65,32 @@ if __name__ == '__main__':
     t_demonstration = times[-1] - times[0]
     #demonstration, velocities, accelerations, times = generate_example(t_demonstration)
 
-    all_trajectories = np.zeros( (len(ubot_joint_traj), len(ubot_joint_traj[0])) )
+
+    #############################################################################################
+    ########################## Generates DMPs and writes them as rosbags#########################
+    all_trajectories = np.empty( (1, 1) )
     timesteps = list()
     for joint_index in range(len(ubot_joint_traj[0])):
         trajectory = [pos[joint_index] for pos in ubot_joint_traj]
-
         demonstration, velocities, accelerations, times = diff_demonstration(trajectory, t_demonstration)
-        demons_vec = np.asarray(demonstration)
+
+        dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
+        dmp.learn_dmp(times, demonstration, velocities, accelerations)
+        tau = times[-1] - times[0]
+        x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
+
+        plotDMP(times, demonstration, t, x)
+
+        demons_vec = np.asarray(x)
         
-        all_trajectories[:,joint_index] = demons_vec
-        timesteps = times
+        if all_trajectories.shape == (1, 1):
+            print "RESHAPING"
+            all_trajectories.resize( (len(x), len(ubot_joint_traj[0])) )
+        
+        all_trajectories[:,joint_index] = demons_vec[:,0]
+        timesteps = t
 
-    Writer.writePositions("idontknow_pos.bag", all_trajectories, timesteps)
+    Writer.writePositions("idontknow_out_pos.bag", all_trajectories, timesteps)
+    ###############################################################################################
+    ###############################################################################################
 
-
-    shoulder1_traj = [traj[Reader.JH_SHOULDER1] for traj in ubot_joint_traj]
-    demonstration, velocities, accelerations, times = diff_demonstration(shoulder1_traj, t_demonstration)
-
-
-    dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
-    dmp.learn_dmp(times, demonstration, velocities, accelerations)
-
-    tau = times[-1] - times[0]
-    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
-
-    plt.plot(t, x, c="b")
-    plt.plot(times, demonstration, c="r")
-
-
-    plt.show()

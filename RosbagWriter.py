@@ -1,5 +1,6 @@
 import rosbag
 from ubot_msgs.msg import JointPositions 
+from rospy import Time
 
 class Writer:
     JH_WHEEL1     = 0     #hinge joint for wheel 1
@@ -26,16 +27,15 @@ class Writer:
             joint_pos.positions = values[i]
 
             secs = int(times[i])
-            nsecs = ((times[i] - secs) * 1000) * 1000000
+            nsecs = int(((times[i] - secs) * 1000) * 1000000)
             print "Seconds: ", secs
             print "Nano secs: ", nsecs
 
-            # time = Time()
-            # time.sec = secs
-            # time.nsec = nsecs
-            # joint_pos.stamp = time
+            
+            joint_pos.stamp = Time(secs, nsecs)
 
-            # bag.write(rostopic, joint_pos)
+            bag.write(rostopic, joint_pos)
+        bag.close()
 
 
 
