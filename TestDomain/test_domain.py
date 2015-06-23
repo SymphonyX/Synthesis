@@ -101,7 +101,7 @@ if __name__ == '__main__':
 
     K = 1000.0
     D = 40.0
-    basis = 50
+    basis = 20
 
 
     xseq = np.linspace(startx, goalx, num=100)
