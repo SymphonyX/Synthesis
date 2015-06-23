@@ -1,0 +1,446 @@
+function [ result ] = arm_control( mode, param )
+
+arm = struct;
+arm.plot_bounding_box_const = 1;    % scaling factor to later on determine (wrt total arm length) how large the target source region will be
+arm.NSteps                  = 50; % number of timesteps allowed for target interception movement/trajectory
+arm.initial_theta1          = (3/2) * pi;  % initial angle of link 1
+arm.initial_theta2          = (1/2) * pi;  % initial angle of link 2
+arm.L1                      = 3.0;  % length of link 1
+arm.L2                      = 1.0;  % length of link 2
+arm.link_width              = 0.2;  % width of links 1 and 2
+arm.theta1                  = arm.initial_theta1; % current angle theta1 of link 1
+arm.theta2                  = arm.initial_theta2; % cur angle theta2  of link 2
+arm                         = move_arm_absolute(arm, arm.initial_theta1, arm.initial_theta2); % reset arm
+
+% Select a method for computing an angle trajectory to go from an initial arm position to a given final joint configuration (joint angles), 
+% under the no-friction assumption
+%arm.compute_arm_trajectory = @compute_arm_trajectory_with_constant_velocities;
+%arm.compute_arm_trajectory = @compute_arm_trajectory_with_exponential_velocities;
+%arm.compute_arm_trajectory = @compute_arm_trajectory_with_cubic_velocities;
+%arm.compute_arm_trajectory = @compute_arm_trajectory_with_sigmoid_velocities;
+%arm.compute_arm_trajectory = @compute_arm_trajectory_with_bezier_velocities;
+arm.compute_arm_trajectory = @compute_arm_trajectory_with_mixed_velocities;
+
+% general specification of where target ping pong balls may come from, etc
+targets_specs = struct;
+targets_specs.NTargets                   = 100;  % how many targets will be created
+targets_specs.NSteps                     = arm.NSteps; % same as arm.NSteps because we want targets to reach the interception point when the 
+                                                       % hand reaches it
+targets_specs.slack                      = 0.2; % targets are confined to an ellipse (see below). This specifies how much taller the targets 
+                                                % ellipse is, rather than narrow
+
+targets_specs.target_pos_ellipse_focus_x = (1-targets_specs.slack) * arm.L1; % params of ellipse where targets/interception points 
+                                                                             % will be confined to
+targets_specs.target_pos_ellipse_focus_y = (1+targets_specs.slack) * arm.L1;
+
+targets_specs.origin_min_x               = -arm.plot_bounding_box_const*(arm.L1+arm.L2);  % min x of sky, where targets originate
+targets_specs.origin_max_x               = +arm.plot_bounding_box_const*(arm.L1+arm.L2);  % max x of sky, where targets originate
+targets_specs.origin_y                   = +(1.5+targets_specs.slack)*arm.plot_bounding_box_const*(arm.L1+arm.L2);
+
+
+show_animation   = true;
+
+if show_animation
+    figure(1);
+    clf;
+end
+
+
+[target_positions, target_angles] = enumerate_target_positions(targets_specs);
+for i=1:length(target_positions)
+    
+    target_intercept_x = target_positions(1, i);
+    target_intercept_y = target_positions(2, i);
+    target_angle       = target_angles(i);
+    
+    % create a target that will fly to some given x,y coordinates
+    target = create_target(targets_specs, target_intercept_x, target_intercept_y);
+    
+    % generate arm trajectory in terms of ABSOLUTE angles, in order to reach a given target position
+    [arm_goal_theta1, arm_goal_theta2] = inverse_kinematics(arm, target_intercept_x, target_intercept_y);
+    arm_trajectory = arm.compute_arm_trajectory(arm, arm_goal_theta1, arm_goal_theta2);
+    
+    % generate arm trajectory in terms of RELATIVE angles, in order to reach a given target position
+    arm_trajectory_relative = compute_arm_relative_trajectory(arm, arm_trajectory);
+        
+    % generate gripper trajectory to allow it to grab the target
+    paddle_goal_theta = compute_paddle_angle(target);
+    paddle_trajectory = compute_paddle_trajectory(targets_specs, paddle_goal_theta);
+    
+    if show_animation
+        % animate moving arm and flying target
+        figure(2);
+        arm = move_arm_absolute(arm, arm.initial_theta1, arm.initial_theta2); % reset arm
+
+        for t=1:arm.NSteps
+            clear_animation_frame(targets_specs);
+            hold on;
+            
+            %draw_all_targets(target_positions);
+            %draw_target_goal_pos(target_intercept_x, target_intercept_y);
+            draw_flying_target(target, t);
+            draw_arm(arm);
+            draw_gripper(arm, arm_trajectory, target, t);
+                        
+            % load next RELATIVE position of the arm and move it
+            cur_arm_theta1_delta = arm_trajectory_relative(1,t);
+            cur_arm_theta2_delta = arm_trajectory_relative(2,t);
+            arm = move_arm_relative(arm, cur_arm_theta1_delta, cur_arm_theta2_delta);
+                        
+            pause(0.01);
+            hold off;
+        end        
+        %pause(0.2);
+        pause;
+    end
+    
+        
+end
+
+end
+
+
+
+
+
+
+%------------------------------------------------------
+% given x,y of end effector, computes angles of link 1 and 2
+function [theta1, theta2] = inverse_kinematics(arm, desired_x, desired_y)
+
+% c2 needs to be in [-1,1], otherwise point is outside reachable workspace
+c2 = (desired_x^2 + desired_y^2 - arm.L1^2 - arm.L2^2) / (2*arm.L1 * arm.L2);
+s2 = -sqrt(1 - c2^2); % could be + or -, because there are two solutions to inv. kinematics. I just pick one
+
+theta2 = atan2(s2, c2);
+theta1 = atan2(desired_y, desired_x) - atan2(arm.L2 * s2, arm.L1 + arm.L2 * c2);
+
+end
+
+%------------------------------------------------------
+% move arm to absolute new angle configuration, ie, takes those angles and
+% compute new (x,y) position of the base of link1 and of its tip, and (x,y) of
+% base of link 2 and and of its tip (note, x,y of tip of link2==x,y of end effector)
+function arm = move_arm_absolute(arm, theta1, theta2)
+
+
+arm.theta1 = theta1;
+arm.theta2 = theta2;
+
+arm.L1_pos   = [0                          0;
+    arm.L1 * cos(theta1) ...
+    arm.L1 * sin(theta1)];
+arm.L2_pos   = [arm.L1_pos(2, :);
+    arm.L1 * cos(theta1) + arm.L2 * cos(theta1 + theta2) ...
+    arm.L1 * sin(theta1) + arm.L2 * sin(theta1 + theta2)];
+end
+
+
+%------------------------------------------------------
+% updates link angles by delta_theta1 and delta_theta2 radians
+% and moves arm -- i.e, takes those new angles and
+% compute new (x,y) position of the base of link1 and of its tip, and (x,y) of
+% base of link 2 and and of its tip (note, x,y of tip of link2==x,y of end effector)
+
+function arm = move_arm_relative(arm, delta_theta1, delta_theta2)
+arm.theta1 = arm.theta1 + delta_theta1;
+arm.theta2 = arm.theta2 + delta_theta2;
+
+arm.L1_pos   = [0                          0;
+    arm.L1 * cos(arm.theta1) ...
+    arm.L1 * sin(arm.theta1)];
+arm.L2_pos   = [arm.L1_pos(2, :);
+    arm.L1 * cos(arm.theta1) + arm.L2 * cos(arm.theta1 + arm.theta2) ...
+    arm.L1 * sin(arm.theta1) + arm.L2 * sin(arm.theta1 + arm.theta2)];
+end
+
+
+
+
+
+
+
+
+
+
+
+% random shit
+
+
+
+%------------------------------------------------------
+% generates a set of target positions: positions where the ping pong ball will fly to, and where the hand
+% will try to intercept them
+function [target_positions, desired_angles] = enumerate_target_positions(targets_specs)
+
+desired_angles  = linspace(0, pi, targets_specs.NTargets);
+positions_x     = cos(desired_angles) .* targets_specs.target_pos_ellipse_focus_x;
+positions_y     = sin(desired_angles) .* targets_specs.target_pos_ellipse_focus_y;
+
+target_positions = [positions_x; positions_y];
+
+end
+
+%------------------------------------------------------
+% given a final angle for the gripper, generates a linear sequence of angles from initial angle to goal angle theta_paddle
+function paddle_trajectory = compute_paddle_trajectory(targets_specs, theta_paddle)
+%paddle_trajectory = linspace(0, theta_paddle, targets_specs.NSteps);
+paddle_trajectory = linspace(theta_paddle, theta_paddle, targets_specs.NSteps);
+end
+
+
+
+%------------------------------------------------------
+function target = create_target(targets_specs, target_goal_x, target_goal_y)
+
+target = struct;
+target.goal_x = target_goal_x;
+target.goal_y = target_goal_y;
+
+% selects a (random) origin position where the ping pong ball will be generated at, 
+% and generates a trajectory connecting that to the ball's goal coordinates
+target = generate_target_trajectory(targets_specs, target);
+
+end
+
+
+%------------------------------------------------------
+% computes angle of the gripper/paddle wrt the target, so we can automatically orient the gripper
+% correctly and it can try to grab the ping pong ball
+function theta_paddle = compute_paddle_angle(target)
+
+target_trajectory_m = (target.goal_y - target.origin_y) / (target.goal_x - target.origin_x);
+paddle_m = (-1 / target_trajectory_m);
+theta_paddle = paddle_m;
+
+end
+
+
+%------------------------------------------------------
+function draw_gripper(arm, arm_trajectory, target, t)
+
+final_effector_theta1 = arm_trajectory(1, end-1);
+final_effector_theta2 = arm_trajectory(2, end-1);
+final_effector_x = arm.L1 * cos(final_effector_theta1) + arm.L2 * cos(final_effector_theta1 + final_effector_theta2);
+final_effector_y = arm.L1 * sin(final_effector_theta1) + arm.L2 * sin(final_effector_theta1 + final_effector_theta2);
+%plot(final_effector_x, final_effector_y, 'Or');
+
+final_target_x = target.goal_x;
+final_target_y = target.goal_y;
+%plot(final_target_x, final_target_y, 'Ob');
+
+final_paddle_angle = atan2(final_target_y - final_effector_y, final_target_x - final_effector_x) + pi/2;
+
+paddle_angle_schedule = linspace(0, final_paddle_angle, length(arm_trajectory));
+current_paddle_angle  = paddle_angle_schedule(t);
+
+th = linspace( 0, pi, 100) + current_paddle_angle;
+R = 0.7;
+[cur_arm_pos_x, cur_arm_pos_y] = get_end_effector_pos(arm);
+x = R*cos(th) + sin(current_paddle_angle)*R + cur_arm_pos_x;
+y = R*sin(th) - cos(current_paddle_angle)*R + cur_arm_pos_y;
+plot3(x, y, -ones(1,length(x)), 'LineWidth', 6.0, 'Color',[0.35,0.7,0.4]);
+
+
+
+end
+
+
+%------------------------------------------------------
+function draw_flying_target(target, timestep)
+% draw current pos of the ping pong ball
+plot(target.target_trajectory(1,timestep), target.target_trajectory(2,timestep), '*k', 'MarkerSize', 12, 'MarkerFaceColor','r');
+end
+
+
+%------------------------------------------------------
+function target = generate_target_trajectory(targets_specs, target)
+
+target.origin_x  = unifrnd(targets_specs.origin_min_x, targets_specs.origin_max_x);
+target.origin_y  = targets_specs.origin_y;
+
+trajectory_x = linspace(target.origin_x, target.goal_x, targets_specs.NSteps);
+trajectory_y = linspace(target.origin_y, target.goal_y, targets_specs.NSteps);
+target.target_trajectory = [trajectory_x; trajectory_y];
+
+end
+
+%------------------------------------------------------
+function trajectory = bezier(p, n)
+t = linspace(0, 1, n);
+trajectory = p(1) .* (1 - t).^3 + ...
+    p(2) .* (1 - t).^2 .* t.*3 + ...
+    p(3) .* (1 - t) .* (t.^2) .* 3 + ...
+    p(4) .* (t.^3);
+end
+
+
+%------------------------------------------------------
+function arm_trajectory_relative = compute_arm_relative_trajectory(arm, arm_trajectory)
+arm_trajectory_relative = [arm_trajectory(1,1)-arm.initial_theta1 diff(arm_trajectory(1,:)); ...
+    arm_trajectory(2,1)-arm.initial_theta2 diff(arm_trajectory(2,:))];
+end
+
+
+%------------------------------------------------------
+% These need to be monotonically increasing or decreasing
+% All these should generate N+1 steps and then remove the first one. Reason is that linspace includes the initial angles,
+% so we never need to run 1st cmd. If cmd is an abs angle, it's same as already-set curangle; in relative, it's a delta of 0.
+% Both have no effect and should be removed
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_mixed_velocities(arm, target_theta1, target_theta2)
+x = compute_arm_trajectory_with_bezier_velocities(arm, target_theta1, target_theta2);
+y = compute_arm_trajectory_with_sigmoid_velocities(arm, target_theta1, target_theta2);
+trajectory = [x(1,:); y(2,:)];
+end
+
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_exponential_velocities(arm, target_theta1, target_theta2)
+base_traj       = 2.^(linspace(-1,1,arm.NSteps+1));
+normalized_traj = (base_traj-min(base_traj)) / (max(base_traj)-min(base_traj));
+trajectory_theta1 = normalized_traj * (target_theta1 - arm.initial_theta1) + arm.initial_theta1;
+trajectory_theta2 = normalized_traj * (target_theta2 - arm.initial_theta2) + arm.initial_theta2;
+trajectory = [trajectory_theta1(2:end); trajectory_theta2(2:end)];
+end
+
+
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_constant_velocities(arm, target_theta1, target_theta2)
+trajectory_theta1 = linspace(arm.initial_theta1, target_theta1, arm.NSteps+1);
+trajectory_theta2 = linspace(arm.initial_theta2, target_theta2, arm.NSteps+1);
+trajectory = [trajectory_theta1(2:end); trajectory_theta2(2:end)];
+end
+
+
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_cubic_velocities(arm, target_theta1, target_theta2)
+base_traj       = linspace(-1,1,arm.NSteps+1).^3;
+normalized_traj = (base_traj-min(base_traj)) / (max(base_traj)-min(base_traj));
+trajectory_theta1 = normalized_traj * (target_theta1 - arm.initial_theta1) + arm.initial_theta1;
+trajectory_theta2 = normalized_traj * (target_theta2 - arm.initial_theta2) + arm.initial_theta2;
+trajectory = [trajectory_theta1(2:end); trajectory_theta2(2:end)];
+end
+
+
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_sigmoid_velocities(arm, target_theta1, target_theta2)
+temperature = 5.0;
+base_traj       = 1./(1 + exp(linspace(-1,1,arm.NSteps+1)).^(-temperature));
+normalized_traj = (base_traj-min(base_traj)) / (max(base_traj)-min(base_traj));
+trajectory_theta1 = normalized_traj * (target_theta1 - arm.initial_theta1) + arm.initial_theta1;
+trajectory_theta2 = normalized_traj * (target_theta2 - arm.initial_theta2) + arm.initial_theta2;
+trajectory = [trajectory_theta1(2:end); trajectory_theta2(2:end)];
+end
+
+%------------------------------------------------------
+function trajectory = compute_arm_trajectory_with_bezier_velocities(arm, target_theta1, target_theta2)
+normalized_traj = bezier([0 0.7 0.3 1], arm.NSteps+1);
+trajectory_theta1 = normalized_traj * (target_theta1 - arm.initial_theta1) + arm.initial_theta1;
+trajectory_theta2 = normalized_traj * (target_theta2 - arm.initial_theta2) + arm.initial_theta2;
+trajectory = [trajectory_theta1(2:end); trajectory_theta2(2:end)];
+end
+
+
+
+%------------------------------------------------------
+function draw_all_targets(target_positions)
+
+plot(target_positions(1,:), target_positions(2,:), 'ok', 'MarkerSize', 6, 'MarkerFaceColor','k');
+
+end
+
+%------------------------------------------------------
+function draw_target_goal_pos(target_intercept_x, target_intercept_y)
+
+plot(target_intercept_x, target_intercept_y, 'Ok', 'MarkerSize', 20, 'MarkerFaceColor','r');
+
+end
+
+%------------------------------------------------------
+function clear_animation_frame(targets_specs)
+
+clf;
+min_x = -targets_specs.origin_max_x;
+max_x = +targets_specs.origin_max_x;
+min_y = -targets_specs.origin_y;
+max_y = +targets_specs.origin_y;
+
+%plot([min_x max_x], [max_y max_y], 'b', 'LineWidth', 20.0); % draws opaque sky
+draw_transparent_line([min_x max_y], [max_x max_y], 0.5, 'b');
+
+axis([min_x max_x min_y max_y]);
+axis equal;
+
+end
+
+
+
+
+%------------------------------------------------------
+function [x,y] = get_end_effector_pos(arm)
+
+x = arm.L1 * cos(arm.theta1) + arm.L2 * cos(arm.theta1 + arm.theta2);
+y = arm.L1 * sin(arm.theta1) + arm.L2 * sin(arm.theta1 + arm.theta2);
+
+end
+
+
+%------------------------------------------------------
+function draw_arm(arm)
+
+% Opaque arm
+%plot(arm.L1_pos(:,1), arm.L1_pos(:,2), 'r', 'LineWidth', 7.0);  %%%
+%plot(arm.L2_pos(:,1), arm.L2_pos(:,2), 'b', 'LineWidth', 7.0);
+
+draw_transparent_line(arm.L1_pos(1,:), arm.L1_pos(2,:), 0.2, 'r');
+draw_transparent_line(arm.L2_pos(1,:), arm.L2_pos(2,:), 0.2, 'b');
+
+
+plot(arm.L1_pos(1,1), arm.L1_pos(1,2), 'ok', 'MarkerSize', 13, 'MarkerFaceColor','k'); %%%
+plot(arm.L1_pos(2,1), arm.L1_pos(2,2), 'ok', 'MarkerSize', 13, 'MarkerFaceColor','k');
+plot(arm.L2_pos(2,1), arm.L2_pos(2,2), 'ok', 'MarkerSize', 13, 'MarkerFaceColor','k');
+
+
+
+end
+
+
+%------------------------------------------------------
+function y = deg2rad(x)
+y = x * pi/180;
+end
+
+%------------------------------------------------------
+function y = rad2deg(x)
+y = x * 180 / pi;
+end
+
+
+%------------------------------------------------------
+function draw_transparent_line(p1, p2, width, color)
+
+x = [p1(1) p2(1)];
+y = [p1(2) p2(2)];
+
+zdata = -ones(1,4); % we want the arms to be drawn behind the joints
+
+% dark magic to determine direction in which to add or subtract width,
+% depending on how the x and y coordinates of p1 and p2 relate
+a=1; b=1;
+if (p1(1)-p2(1)) * (p1(2) - p2(2)) > 0
+    b=-a;
+end
+if (p1(1)==p2(1))
+    b=0;
+end
+if (p1(2)==p2(2))
+    a=0;
+end
+
+
+
+xflip = [x+a*width fliplr(x)-a*width];
+yflip = [y+b*width fliplr(y)-b*width];
+patch(xflip, yflip, zdata, 'k', 'EdgeAlpha', 0.5, 'FaceAlpha', 0.6, 'FaceColor', color);
+
+end
