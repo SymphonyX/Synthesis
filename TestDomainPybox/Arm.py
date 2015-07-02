@@ -36,15 +36,14 @@ class Arm:
         self.pivot1.CreateFixture(shape=circle, density=0.0, friction=0.0)
 
 
-        self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=100000, motorSpeed=0.0)
+        self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0)
 
     def set_pivot_positions(self):
         self.pivot_position1 = (self.basex-self.link1.length/2.0, self.screen_height-self.basey)
 
         self.pivot_position2 = (self.pivot_position1[0]+(self.link1.length * math.cos(self.link1.body.angle)), \
                                                          self.pivot_position1[1]+(self.link1.length * math.sin(self.link1.body.angle)))
-
 
 
     def move_arm_absolute(self, theta1, theta2):
@@ -71,16 +70,5 @@ class Arm:
         theta1 = math.atan2(desired_y, desired_x) - math.atan2(self.link2.length * s2, self.link1.length + self.link2.length * c2)
 
         return theta1, theta2
-
-    def move_arm_relative(self, delta1, delta2):
-        self.link1.rotation += delta1
-        self.link2.rotation += delta2
-
-        self.link1.pos = [(self.basex, self.basey), \
-                        (self.basex + self.link1.length * math.cos(self.link1.rotation), self.basey + self.link1.length * math.sin(self.link1.rotation))
-                        ]
-        self.link2.pos = [self.link1.pos[1], \
-                        (self.link1.pos[1][0] + self.link1.length * math.cos(self.link1.rotation) + self.link2.length * math.cos(self.link1.rotation + self.link2.rotation), self.link1.pos[1][1] + self.link1.length * math.sin(self.link1.rotation) + self.link2.length * math.sin(self.link1.rotation + self.link2.rotation)) \
-                        ]                    
 
 
