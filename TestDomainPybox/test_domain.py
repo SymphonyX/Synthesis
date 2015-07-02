@@ -133,8 +133,8 @@ def error_func(x):
 
     print "\nError: ", error
     print "Distances: ", sum_distances
-    print "Cost: ", (100*error) + distance + (10*sum_distances)
-    return (100*error) + distance + (10*sum_distances)
+    print "Cost: ", (100*error) + distance + sum_distances
+    return (100*error) + distance + sum_distances
 
 
 def diff_demonstration(demonstration, time):
