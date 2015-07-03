@@ -27,18 +27,22 @@ height = 750
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2 + 80, (height / 4)*3 - 100)
+origin = (width / 2 + 80, (height / 4)*3 - 300)
 dmp_dt = 0.02
+fpsClock = None
+
+best_error = float("inf")
+best_params = None
+best_distance = float("inf")
 
 class DomainObject:
 
     def __init__(self, position, color, radius, target_radius, world):
         self.position = position
-        self.target_position = (position[0]+target_radius, position[1])
+        self.target_position = (position[0], position[1]-target_radius)
         self.target_radius = target_radius
         self.color = color
         self.radius = radius
-        self.box2dpos = (position[0], height-position[1])
 
         fixture=b2FixtureDef(
                         shape=b2PolygonShape(box=(15, 15)),
@@ -47,10 +51,11 @@ class DomainObject:
                         )
 
         self.body=world.CreateDynamicBody(
-                    position=self.box2dpos,
+                    position=(position[0], height-position[1]),
                     fixtures=fixture,
                 )
         self.body.shape = fixture.shape
+        self.body.userData = "target"
 
     def draw(self):
         vertices=[(self.body.transform*v) for v in self.body.shape.vertices]
@@ -74,6 +79,22 @@ def convert_angle_cw(theta):
     return angle_cw
 
 
+def undesired_contact(world):
+    for edge in world.arm.tool.body1.contacts:
+        data1 = edge.contact.fixtureA.body.userData
+        data2 = edge.contact.fixtureB.body.userData
+        if data1 == "link1" or data1 == "link2" or data2 == "link1" or data2 == "link2":
+            return True
+
+    for edge in world.arm.tool.body2.contacts:
+        data1 = edge.contact.fixtureA.body.userData
+        data2 = edge.contact.fixtureB.body.userData
+        if data1 == "link1" or data1 == "link2" or data2 == "link1" or data2 == "link2":
+            return True
+
+    return False
+
+
 
 def error_func(x):
 
@@ -86,8 +107,6 @@ def error_func(x):
         dmp1.weights[i] = x[count]
         dmp2.weights[i] = x[count+basis]
         count += 1
-
-    print x
 
     xpos, xdot, xddot, times = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
     all_pos.append( xpos )
@@ -104,19 +123,22 @@ def error_func(x):
     step = 0
 
     thetas_reached = True
-    PD1 = PID(P=100.0, I=0.0, D=1800.0)
-    PD2 = PID(P=40.0, I=0.0, D=800.0)
+    PD1 = PID(P=200.0, I=0.0, D=1800.0)
+    PD2 = PID(P=80.0, I=0.0, D=800.0)
 
     closest_distance = float("inf")
+    penalty = 0
     while step < len(all_pos[0]) or thetas_reached == False:
+        penalty = 0
         if thetas_reached == True:
             set_joints_iteration(all_pos[0][step], all_pos[1][step], PD1, PD2)
             step += 1
             thetas_reached = False
+            contact = 0
         else:
             thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, PD1, PD2)
-            distance = math.sqrt( (world.domain_object.body.position[0] - world.arm.link2.body.position[0])**2 \
-                                 + (world.domain_object.body.position[1] - world.arm.link2.body.position[1])**2 ) #TODO this is only checking against the center
+            distance = math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
+                                 + (world.domain_object.body.position[1] - world.arm.tool.body2.position[1])**2 ) #TODO this is only checking against the center
             if distance < closest_distance:
                 closest_distance = distance
 
@@ -127,14 +149,32 @@ def error_func(x):
             world.domain_object.body.angularVelocity = 0.0
             world.domain_object.body.linearVelocity = b2Vec2(0,0)
 
+        if undesired_contact(world):
+            contact += 1
+            penalty += 10000
+            if contact == 100:
+                break
+
+
 
     
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
 
+    total_error =  (100*error) + distance + sum_distances +  penalty
+    global best_error
+    global best_params
+    global best_distance
+
+    if total_error < best_error:
+        best_error = total_error
+        best_params = x
+        best_distance = error
+
     print "\nError: ", error
     print "Distances: ", sum_distances
-    print "Cost: ", (100*error) + distance + sum_distances
-    return (100*error) + distance + sum_distances
+    print "Cost: ", total_error
+
+    return total_error
 
 
 def diff_demonstration(demonstration, time):
@@ -162,7 +202,8 @@ def update_screen(world):
 
     world.domain_object.draw()
 
-    bodies = [world.arm.link1.body, world.arm.link2.body]
+    bodies = [world.arm.link1.body, world.arm.link2.body, world.arm.tool.body1, world.arm.tool.body2]
+    colors = [arm_color, arm_color, (0, 0, 255, 0), (0, 0, 255, 0)]
     for i, body in enumerate(bodies):
         for fixture in body.fixtures:
             shape=body.shape
@@ -170,7 +211,7 @@ def update_screen(world):
             vertices=[(body.transform*v) for v in shape.vertices]
             vertices=[(v[0], height-v[1]) for v in vertices]
 
-            pygame.draw.polygon(display, arm_color, vertices)
+            pygame.draw.polygon(display, colors[i], vertices)
 
 
     # draw circles at joints for pretty
@@ -187,7 +228,7 @@ def reset_world(arm_origin):
     world = b2World(gravity=(0,0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, target_radius=200, world=world)
     world.arm = Arm(arm_origin[0], arm_origin[1], 170, 150)
-    world.arm.createBodies(world, height)
+    world.arm.createBodies(world)
     return world
 
 
@@ -246,13 +287,25 @@ if __name__ == '__main__':
         param_file = open(sys.argv[1], "r")
         result = pickle.load(param_file)
     else:
-        params = np.random.uniform( 0, 2*math.pi, (basis*2+4, 1) )
-        epsilons = np.zeros( (basis*2+4) )
-        epsilons[:4] = 0.00001
-        epsilons[4:] = 0.001
-        print epsilons.shape
-        result = fmin_bfgs(error_func, [ params ], epsilon=epsilons)
-        print result
+
+        for j in range(5):
+            params = np.random.uniform( 0, 2*math.pi, (basis*2+4, 1) )
+            epsilons = np.zeros( (basis*2+4) )
+            epsilons[:4] = 0.01
+            epsilons[4:] = 0.1
+            for i in range(10):
+                result = fmin_bfgs(error_func, [ params ], epsilon=epsilons, maxiter=1000)
+                epsilons[:4] = epsilons[:4] / 10.0
+                epsilons[4:] = epsilons[4:] / 10.0
+
+                params = best_params
+
+
+
+        print "Best error: ", best_error
+        print "Best params: ", best_params, "\n\n"
+
+        result = best_params
 
         param_file = open("params.pkl", "w")
         pickle.dump(result, param_file)
@@ -281,9 +334,9 @@ if __name__ == '__main__':
     thetas_reached = True
     step = 0
 
-    PD1 = PID(P=100.0, I=0.0, D=1800.0)
-    PD2 = PID(P=40.0, I=0.0, D=800.0)
-    while True:    
+    PD1 = PID(P=200.0, I=0.0, D=1800.0)
+    PD2 = PID(P=80.0, I=0.0, D=800.0)
+    while True:
         display.fill(white)
 
         if thetas_reached == True:
@@ -291,6 +344,7 @@ if __name__ == '__main__':
             if step < len(x1)-1:
                 step += 1
             thetas_reached = False
+            contact = 0
         else:
             thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, PD1, PD2, printing=True)
 
@@ -317,3 +371,8 @@ if __name__ == '__main__':
         error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
         print "Step %d/%d" %(step, len(x1))
         print "Error: ", error
+
+        if undesired_contact(world):
+            contact += 1
+            if contact == 100:
+                break
