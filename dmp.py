@@ -13,6 +13,7 @@ class DMP:
             self.mus[i] =  (step / 2) + i * step
             self.sigmas[i] = 1.0 / num_basis
 
+
         self.K = K
         self.D = D
         self.start = start

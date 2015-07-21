@@ -1,8 +1,8 @@
 from dmp import DMP
 import numpy as np
 import matplotlib.pyplot as plt
-from RosbagReader import Reader
-from RosbagWriter import Writer
+# from RosbagReader import Reader
+# from RosbagWriter import Writer
 
 def quadraticFunc(x):
     out = list()
@@ -58,39 +58,62 @@ if __name__ == '__main__':
     D = 40.0
     basis = 50
 
-    ubot_joint_traj, times = Reader.jointPositions("idontknow.bag")
-    #ubot_joint_vel, times = Reader.jointVelocities("idontknow.bag")
-    #ubot_joint_torques, times = Reader.jointTorques("idontknow.bag")
-  
-    t_demonstration = times[-1] - times[0]
-    #demonstration, velocities, accelerations, times = generate_example(t_demonstration)
+    #################################################################################
+    ###################### Synthetic Example ########################################
+    t_demonstration = 10
+    demonstration, velocities, accelerations, times = generate_example(t_demonstration)
+    dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
+    dmp.learn_dmp(times, demonstration, velocities, accelerations)
+    tau = times[-1] - times[0]
+    x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
+    plotDMP(times, demonstration, t, x)
 
+
+
+    reverse_pos = [pos[0] for pos in list(reversed(x))]
+    demonstration1, velocities1, accelerations1, times = diff_demonstration(reverse_pos, t_demonstration)
+    dmp1 = DMP(basis, K, D, demonstration1[0], demonstration1[-1])
+    print "DMP pos: ", dmp1.pos
+    print "Demo: ", demonstration1[0]
+
+    dmp1.learn_dmp(times, demonstration1, velocities1, accelerations1)
+    print "Demo: ", demonstration1[0]
+    
+    tau = times[-1] - times[0]
+    x, xdot, xddot, t = dmp1.run_dmp(tau, 0.01, demonstration1[0], demonstration1[-1])
+    plotDMP(times, demonstration1, t, x)
+    #################################################################################
 
     #############################################################################################
     ########################## Generates DMPs and writes them as rosbags#########################
-    all_trajectories = np.empty( (1, 1) )
-    timesteps = list()
-    for joint_index in range(len(ubot_joint_traj[0])):
-        trajectory = [pos[joint_index] for pos in ubot_joint_traj]
-        demonstration, velocities, accelerations, times = diff_demonstration(trajectory, t_demonstration)
+    #ubot_joint_traj, times = Reader.jointPositions("idontknow.bag")
+    #ubot_joint_vel, times = Reader.jointVelocities("idontknow.bag")
+    #ubot_joint_torques, times = Reader.jointTorques("idontknow.bag")
+    # t_demonstration = times[-1] - times[0]
 
-        dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
-        dmp.learn_dmp(times, demonstration, velocities, accelerations)
-        tau = times[-1] - times[0]
-        x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
+    # all_trajectories = np.empty( (1, 1) )
+    # timesteps = list()
+    # for joint_index in range(len(ubot_joint_traj[0])):
+    #     trajectory = [pos[joint_index] for pos in ubot_joint_traj]
+    #     demonstration, velocities, accelerations, times = diff_demonstration(trajectory, t_demonstration)
 
-        plotDMP(times, demonstration, t, x)
+    #     dmp = DMP(basis, K, D, demonstration[0], demonstration[-1])
+    #     dmp.learn_dmp(times, demonstration, velocities, accelerations)
+    #     tau = times[-1] - times[0]
+    #     x, xdot, xddot, t = dmp.run_dmp(tau, 0.01, demonstration[0], demonstration[-1])
 
-        demons_vec = np.asarray(x)
+    #     plotDMP(times, demonstration, t, x)
+
+    #     demons_vec = np.asarray(x)
         
-        if all_trajectories.shape == (1, 1):
-            print "RESHAPING"
-            all_trajectories.resize( (len(x), len(ubot_joint_traj[0])) )
+    #     if all_trajectories.shape == (1, 1):
+    #         print "RESHAPING"
+    #         all_trajectories.resize( (len(x), len(ubot_joint_traj[0])) )
         
-        all_trajectories[:,joint_index] = demons_vec[:,0]
-        timesteps = t
+    #     all_trajectories[:,joint_index] = demons_vec[:,0]
+    #     timesteps = t
 
-    Writer.writePositions("idontknow_out_pos.bag", all_trajectories, timesteps)
+    # Writer.writePositions("idontknow_out_pos.bag", all_trajectories, timesteps)
     ###############################################################################################
     ###############################################################################################
 

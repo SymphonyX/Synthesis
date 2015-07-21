@@ -25,24 +25,26 @@ class Arm:
 
     def createBodies(self, world):
         self.link1.pos = [ (self.basex, self.basey) ]
-        self.link2.pos = [ (self.basex+self.link1.length, self.basey) ]
+        self.link2.pos = [ (self.basex+self.link1.length-10, self.basey) ]
+
+
         self.link1.createBody(world, "link1")
         self.link2.createBody(world, "link2")
-
-
 
         self.set_pivot_positions()
 
         self.pivot1 = world.CreateKinematicBody(position=self.pivot_position1)
         circle=b2CircleShape(pos=self.pivot1.position, radius=1.0)
         self.pivot1.CreateFixture(shape=circle, density=0.0, friction=0.0)
-
+        self.pivot1.userData = "pivot1"
 
         self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
 
         self.tool = Tool(self.link2.body.position.x + self.link2.length / 2.0, self.link2.body.position.y, world, 100.0)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableLimit=True, lowerAngle=0.0, upperAngle=0.0)
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableLimit=True, lowerAngle=-math.pi/4.0, upperAngle=(5.0/4.0)*math.pi)
+
+
 
     def set_pivot_positions(self):
         self.pivot_position1 = (self.basex-self.link1.length/2.0, self.basey)
