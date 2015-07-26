@@ -1,4 +1,5 @@
-from Arm import *
+from Arm import Arm
+import pygame
 import sys
 sys.path.insert(0, "../")
 
@@ -11,7 +12,6 @@ import numpy as np
 import math
 import Box2D
 from Box2D import *
-from Box2D.b2 import *
 from PID import PID
 import pickle
 from optparse import OptionParser
@@ -107,12 +107,19 @@ def undesired_contact(world):
     return False
 
 def normalize_dmp_pos(xpos):
+    # m = min(xpos)
+    # r = max(xpos) - m
+    # array = (xpos - m) / r
+
+    # normalized = (array*(2*math.pi))
+    # return normalized
+
     xpos_clean = []
     for xi in xpos:
         if xi > math.pi * 2:
             xpos_clean.append(math.pi * 2)
-        elif xi < 0:
-            xpos_clean.append(0)
+        elif xi < -math.pi * 2:
+            xpos_clean.append(-math.pi * 2)
         else:
             xpos_clean.append(xi[0])
     return xpos_clean
@@ -133,11 +140,11 @@ def error_func(x):
 
     xpos, xdot, xddot, times = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
     xpos_clean = normalize_dmp_pos(xpos)
-    all_pos.append( xpos )
+    all_pos.append( xpos_clean )
 
     xpos, xdot, xddot, times = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
     xpos_clean = normalize_dmp_pos(xpos)
-    all_pos.append( xpos )
+    all_pos.append( xpos_clean )
 
 
     sum_distances = 0
@@ -159,8 +166,6 @@ def error_func(x):
             step += 1
             thetas_reached = False
             contact = 0
-      #      avg_error += (math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + \
-       #          (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)) / len(all_pos[0])
         else:
             thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2)
             tool_distance += math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
@@ -199,7 +204,7 @@ def error_func(x):
         total_steps += 1
 
     #total_error =  (1000*error) + tool_distance  + penalty + 0.1*traveled_distance + 0.1*sum_distances#( 5 * (np.linalg.norm(all_pos[0]) + np.linalg.norm(all_pos[1])))
-    cost = (1000 * (total_error/total_steps)) + penalty + ( 100.0 * sum_distances) #(np.linalg.norm(x))
+    cost = (1000 * (total_error/total_steps))# + penalty + ( 10.0 * sum_distances)
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
     global best_error
@@ -340,7 +345,7 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 5
+        outer_iter = 1 if options.params is not None else 10
         for j in range(outer_iter):
             iterations = 5
             if options.params is not None:
@@ -401,8 +406,8 @@ if __name__ == '__main__':
 
     x1, x1dot, x1ddot, t1 = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
     x2, x2dot, x2ddot, t2 = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
-    # x1 = normalize_dmp_pos(x1)
-    # x2 = normalize_dmp_pos(x2)
+    x1 = normalize_dmp_pos(x1)
+    x2 = normalize_dmp_pos(x2)
 
     plt.plot(t1, x1, "b")
     plt.show()
@@ -425,7 +430,6 @@ if __name__ == '__main__':
             thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, printing=True)
 
         update_screen(world)
-        update_screen(world)
 
         # check for quit
         for event in pygame.event.get():
@@ -436,6 +440,16 @@ if __name__ == '__main__':
 
         world.Step(dt, 20, 20)
         world.ClearForces()
+
+
+        error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+        print "Step %d/%d" %(step, len(x1))
+        print "Error: ", error
+
+        font = pygame.font.SysFont('Arial', 25)
+        display.blit(font.render('Goal: pi = ' + str(target_theta), True, (0,0,0)), (200, 100))
+        display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
+        
         pygame.display.flip()
 
         object_contact = False
@@ -451,10 +465,6 @@ if __name__ == '__main__':
 
 
         fpsClock.tick(FPS)
-
-        error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
-        print "Step %d/%d" %(step, len(x1))
-        print "Error: ", error
 
         if undesired_contact(world):
             contact += 1

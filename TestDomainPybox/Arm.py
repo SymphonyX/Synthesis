@@ -28,8 +28,8 @@ class Arm:
         self.link2.pos = [ (self.basex+self.link1.length-10, self.basey) ]
 
 
-        self.link1.createBody(world, "link1")
-        self.link2.createBody(world, "link2")
+        self.link1.createBody(world, "link1", density=0.1)
+        self.link2.createBody(world, "link2", density=0.01)
 
         self.set_pivot_positions()
 
@@ -42,7 +42,7 @@ class Arm:
         self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
 
         self.tool = Tool(self.link2.body.position.x + self.link2.length / 2.0, self.link2.body.position.y, world, 100.0)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableLimit=True, lowerAngle=-math.pi/4.0, upperAngle=(5.0/4.0)*math.pi)
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableLimit=True, lowerAngle=0.0, upperAngle=0.0)
 
 
 
