@@ -29,7 +29,7 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2 + 150, (height / 4)*3 - 500)
+origin = (width / 2 + 100, (height / 4)*3 - 330)
 dmp_dt = 0.2
 fpsClock = None
 
@@ -273,7 +273,7 @@ def update_screen(world):
 def reset_world(arm_origin):
     world = b2World(gravity=(0,0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world)
-    world.arm = Arm(arm_origin[0], arm_origin[1], 300, 300)
+    world.arm = Arm(arm_origin[0], arm_origin[1], 200, 150)
     world.arm.createBodies(world)
     return world
 
@@ -345,7 +345,7 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 10
+        outer_iter = 1 if options.params is not None else 20
         for j in range(outer_iter):
             iterations = 5
             if options.params is not None:
@@ -358,7 +358,7 @@ if __name__ == '__main__':
                 iterations = 10
             elif options.params is None:
                 params = np.random.uniform( -10, 10, (basis*2+2, 1) )
-                params[:2] = np.random.uniform(0, 2*math.pi)
+                params[:2] = np.random.uniform(-2*math.pi, 2*math.pi)
                 epsilons = np.zeros( (basis*2+2) )
                 epsilons[:2] = 0.01
                 epsilons[2:] = 0.1
