@@ -21,9 +21,9 @@ class ArmPart:
 
     def createBody(self, world, userdata="", density=0.1):
         self.body = world.CreateDynamicBody(position=(self.pos[0][0], self.pos[0][1]))
-        self.vertices = [(-self.length/2.0, -self.line_width/2.0), (self.length/2.0, -self.line_width/2.0), (self.length/2.0, self.line_width/2.0), (-self.length/2.0, self.line_width/2.0)]
+        self.vertices = [(-self.line_width/2.0, -self.length/2.0), (-self.line_width/2.0, self.length/2.0), (self.line_width/2.0, self.length/2.0), (self.line_width/2.0, -self.length/2.0)]
         shape = b2PolygonShape(vertices=self.vertices)
-        self.body.CreatePolygonFixture(shape=shape, density=0.1, friction=1.0)
+        self.body.CreatePolygonFixture(shape=shape, density=density, friction=1.0)
         for fix in self.body.fixtures:
             fix.sensor = True
         self.body.shape = shape

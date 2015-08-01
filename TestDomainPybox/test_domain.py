@@ -29,7 +29,7 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2 + 100, (height / 4)*3 - 330)
+origin = (width / 2, (height / 4)*3 - 550)
 dmp_dt = 0.2
 fpsClock = None
 
@@ -39,6 +39,7 @@ best_distance = float("inf")
 target_theta = math.pi
 PD1 = PID(P=100.0, I=0.0, D=15000.0)
 PD2 = PID(P=100.0, I=0.0, D=18000.0)
+PD3 = PID(P=100.0, I=0.0, D=18000.0)
 
 
 class DomainObject:
@@ -51,8 +52,11 @@ class DomainObject:
         self.color = color
         self.radius = radius
 
+        circle = b2CircleShape()
+        circle.radius = 15
+        circle.pos = (0, 0)
         fixture=b2FixtureDef(
-                        shape=b2PolygonShape(box=(15, 15)),
+                        shape=circle,
                         density=0.5,
                         friction=0.1,
                         )
@@ -65,10 +69,9 @@ class DomainObject:
         self.body.userData = "target"
 
     def draw(self):
-        vertices=[(self.body.transform*v) for v in self.body.shape.vertices]
-        vertices=[(v[0], height-v[1]) for v in vertices]
-
-        pygame.draw.polygon(display, self.color, vertices)
+        # vertices=[(self.body.transform*v) for v in self.body.shape.vertices]
+        # vertices=[(v[0], height-v[1]) for v in vertices]
+        pygame.draw.circle(display, self.color, (int(self.body.position[0]), height-int(self.body.position[1])), 20)
         pygame.draw.circle(display, self.color, self.position, self.target_radius, 10)
         pygame.draw.circle(display, (0, 255, 0, 0), self.target_position, 10)
 
@@ -106,7 +109,7 @@ def undesired_contact(world):
 
     return False
 
-def normalize_dmp_pos(xpos):
+def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
     # m = min(xpos)
     # r = max(xpos) - m
     # array = (xpos - m) / r
@@ -116,10 +119,10 @@ def normalize_dmp_pos(xpos):
 
     xpos_clean = []
     for xi in xpos:
-        if xi > math.pi * 2:
-            xpos_clean.append(math.pi * 2)
-        elif xi < -math.pi * 2:
-            xpos_clean.append(-math.pi * 2)
+        if xi > xmax:
+            xpos_clean.append(xmax)
+        elif xi < xmin:
+            xpos_clean.append(xmin)
         else:
             xpos_clean.append(xi[0])
     return xpos_clean
@@ -129,13 +132,16 @@ def error_func(x):
     world = reset_world(origin)
     step = 0
 
-    dmp1 = DMP(basis, K, D, world.arm.link1.body.angle, x[0])
-    dmp2 = DMP(basis, K, D, world.arm.link2.body.angle, x[1])
+    dmp1 = DMP(basis, K, D, world.arm.joint1.angle, x[0])
+    dmp2 = DMP(basis, K, D, world.arm.joint2.angle, x[1])
+    dmp3 = DMP(basis, K, D, world.arm.joint3.angle, x[2])
+
     all_pos  = list()
-    count = 2
+    count = 3
     for i in range(basis):
         dmp1.weights[i] = x[count]
         dmp2.weights[i] = x[count+basis]
+        dmp3.weights[i] = x[count+(2*basis)]
         count += 1
 
     xpos, xdot, xddot, times = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
@@ -146,11 +152,16 @@ def error_func(x):
     xpos_clean = normalize_dmp_pos(xpos)
     all_pos.append( xpos_clean )
 
+    xpos, xdot, xddot, times = dmp3.run_dmp(tau, dmp_dt, dmp3.start, dmp3.goal)
+    xpos_clean = normalize_dmp_pos(xpos, 0, math.pi)
+    all_pos.append( xpos_clean )
+
 
     sum_distances = 0
     for i in range(len(all_pos[0])-1):
         sum_distances += math.fabs(all_pos[0][i+1] - all_pos[0][i])
         sum_distances += math.fabs(all_pos[1][i+1] - all_pos[1][i])
+        sum_distances += math.fabs(all_pos[2][i+1] - all_pos[2][i])
 
     thetas_reached = True
     tool_distance = 0.0
@@ -162,12 +173,12 @@ def error_func(x):
         penalty = 0
         prev_pos = world.domain_object.body.position.copy()
         if thetas_reached == True:
-            set_joints_iteration(all_pos[0][step], all_pos[1][step], world)
+            set_joints_iteration(all_pos[0][step], all_pos[1][step], all_pos[2][step], world)
             step += 1
             thetas_reached = False
             contact = 0
         else:
-            thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2)
+            thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, world.arm.joint3)
             tool_distance += math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
                                  + (world.domain_object.body.position[1] - world.arm.tool.body2.position[1])**2 ) #TODO this is only checking against the center
 
@@ -204,7 +215,7 @@ def error_func(x):
         total_steps += 1
 
     #total_error =  (1000*error) + tool_distance  + penalty + 0.1*traveled_distance + 0.1*sum_distances#( 5 * (np.linalg.norm(all_pos[0]) + np.linalg.norm(all_pos[1])))
-    cost = (1000 * (total_error/total_steps))# + penalty + ( 10.0 * sum_distances)
+    cost = (1000 * (total_error/total_steps)) + ( 100.0 * sum_distances)
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
     global best_error
@@ -273,23 +284,28 @@ def update_screen(world):
 def reset_world(arm_origin):
     world = b2World(gravity=(0,0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world)
-    world.arm = Arm(arm_origin[0], arm_origin[1], 200, 150)
+    world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
     world.arm.createBodies(world)
     return world
 
 
-def set_joints_iteration(theta1, theta2, world):
-    theta1 = convert_angle_ccw( round(theta1, 3) )
-    theta2 = convert_angle_ccw( round(theta2, 3) )
+def set_joints_iteration(theta1, theta2, theta3, world):
+    # theta1 = convert_angle_ccw( round(theta1, 3) )
+    # theta2 = convert_angle_ccw( round(theta2, 3) )
+    # theta3 = convert_angle_ccw( round(theta2, 3) )
 
     angle1 = round(world.arm.joint1.angle, 3)
     angle2 = round(world.arm.joint2.angle, 3)
+    angle3 = round(world.arm.joint3.angle, 3)
 
     if math.fabs(angle1 - theta1) > math.pi:
         theta1 = convert_angle_cw(theta1)
 
     if math.fabs(angle2 - theta2) > math.pi:
         theta2 = convert_angle_cw(theta2)
+
+    if math.fabs(angle3 - theta3) > math.pi:
+        theta3 = convert_angle_cw(theta3)
 
     if theta2 < -math.pi / 1.5:
         theta2 = -math.pi / 1.5
@@ -298,26 +314,32 @@ def set_joints_iteration(theta1, theta2, world):
 
     PD1.setPoint(theta1)
     PD2.setPoint(theta2)
+    PD3.setPoint(theta3)
 
-def move_joints_iteration(joint1, joint2, printing=False):
+
+def move_joints_iteration(joint1, joint2, joint3, printing=False):
     speed1 = PD1.update(joint1.angle) * 1000
     joint1.motorSpeed = speed1
 
     speed2 = PD2.update(joint2.angle) * 1000
     joint2.motorSpeed = speed2
 
+    speed3 = PD3.update(joint3.angle) * 1000
+    joint3.motorSpeed = speed3
+
 
     error1 = PD1.getError()
     error2 = PD2.getError()
+    error3 = PD3.getError()
 
     if printing == True:
-        print "Goal: ", PD1.set_point, PD2.set_point
-        print "Thetas: ", joint1.angle, joint2.angle
-        print "Errors: ", error1, error2
-        print "Speeds: ", speed1, speed2
+        print "Goal: ", PD1.set_point, PD2.set_point, PD3.set_point
+        print "Thetas: ", joint1.angle, joint2.angle, joint3.angle
+        print "Errors: ", error1, error2, error3
+        print "Speeds: ", speed1, speed2, speed3
         print "\n\n"
 
-    if math.fabs(error1) < 0.2 and math.fabs(error2) < 0.2:
+    if math.fabs(error1) < 0.2 and math.fabs(error2) < 0.2 and math.fabs(error3) < 0.2:
         return True
     return False
 
@@ -352,22 +374,22 @@ if __name__ == '__main__':
                 if params is None:
                     params_file = open(options.params, "r")
                     params = pickle.load(params_file)
-                epsilons = np.zeros( (basis*2+2) )
-                epsilons[:2] = 0.01
-                epsilons[2:] = 0.1
+                epsilons = np.zeros( (basis*3+3) )
+                epsilons[:3] = 10.5
+                epsilons[3:] = 10.5
                 iterations = 10
             elif options.params is None:
-                params = np.random.uniform( -10, 10, (basis*2+2, 1) )
-                params[:2] = np.random.uniform(-2*math.pi, 2*math.pi)
-                epsilons = np.zeros( (basis*2+2) )
-                epsilons[:2] = 0.01
-                epsilons[2:] = 0.1
+                params = np.random.uniform( -10, 10, (basis*3+3, 1) )
+                params[:3] = np.random.uniform(-2*math.pi, 2*math.pi)
+                epsilons = np.zeros( (basis*3+3) )
+                epsilons[:3] = 0.05
+                epsilons[3:] = 0.5
 
             for i in range(iterations):
 
                 result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
-                epsilons[:2] = epsilons[:2] / 10.0
-                epsilons[2:] = epsilons[2:] / 10.0
+                epsilons[:3] = epsilons[:3] / 10.0
+                epsilons[3:] = epsilons[3:] / 10.0
 
                 params = best_params
 
@@ -394,26 +416,36 @@ if __name__ == '__main__':
     world = reset_world(origin)
 
 
-    dmp1 = DMP(basis, K, D, world.arm.link1.body.angle, result[0])
-    dmp2 = DMP(basis, K, D, world.arm.link2.body.angle, result[1])
+    dmp1 = DMP(basis, K, D, world.arm.joint1.angle, result[0])
+    dmp2 = DMP(basis, K, D, world.arm.joint2.angle, result[1])
+    dmp3 = DMP(basis, K, D, world.arm.joint3.angle, result[2])
+
     all_pos  = list()
-    count = 2
+    count = 3
     for i in range(basis):
         dmp1.weights[i] = result[count]
         dmp2.weights[i] = result[count+basis]
+        dmp3.weights[i] = result[count+(2*basis)]
         count += 1
 
 
     x1, x1dot, x1ddot, t1 = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
     x2, x2dot, x2ddot, t2 = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
+    x3, x3dot, x3ddot, t3 = dmp3.run_dmp(tau, dmp_dt, dmp3.start, dmp3.goal)
+
     x1 = normalize_dmp_pos(x1)
     x2 = normalize_dmp_pos(x2)
+    x3 = normalize_dmp_pos(x3, 0, math.pi)
 
     plt.plot(t1, x1, "b")
     plt.show()
 
     plt.plot(t2, x2, "r")
     plt.show()
+
+    plt.plot(t3, x3, "g")
+    plt.show()
+
 
 
     thetas_reached = True
@@ -422,12 +454,12 @@ if __name__ == '__main__':
         display.fill(white)
 
         if thetas_reached == True:
-            set_joints_iteration(x1[step], x2[step], world)
+            set_joints_iteration(x1[step], x2[step], x3[step], world)
             step += 1
             thetas_reached = False
             contact = 0
         else:
-            thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, printing=True)
+            thetas_reached = move_joints_iteration(world.arm.joint1, world.arm.joint2, world.arm.joint3, printing=True)
 
         update_screen(world)
 
