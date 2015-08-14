@@ -18,7 +18,7 @@ class GaussianGate(Gate):
         self.experts_weights = list()
 
         for i in range(num_experts):
-            self.sigma[i] = np.identity(dimensions_in) / 10.0
+            self.sigma[i] = np.identity(dimensions_in) / 1000.0
 
         self.saveBestParams()
 
@@ -45,7 +45,10 @@ class GaussianGate(Gate):
 
         params = np.random.random( (len(experts), 1) )
         for i in range(params.shape[0]):
-            params[i] = px_times_alpha[i] / sum(px_times_alpha)
+            sum_px = sum(px_times_alpha)
+            if sum_px == 0:
+                sum_px = 0.00001
+            params[i] = px_times_alpha[i] / sum_px
 
 
         return np.transpose(params)[0]
@@ -55,17 +58,19 @@ class GaussianGate(Gate):
         temp_hs = np.zeros( (len(experts), 1) )
         hs = np.zeros( (len(experts), 1) )
 
-        y = np.transpose(y)
         for i, expert in enumerate(experts):
             expertOutput = expert.computeExpertyhat(x)
-            if expertOutput.shape != y.shape:
-                raise Exception("Output malformated")
             exponent = -0.5 * np.transpose((y - expertOutput)).dot((y - expertOutput))
             g_xv = self.outputs(experts, x)
             temp_hs[i] = g_xv[i] * math.exp( exponent )
 
         for i in range(temp_hs.shape[0]):
-            hs[i] = temp_hs[i] / np.sum(temp_hs, axis=0)
+            sum_temp_hs = np.sum(temp_hs, axis=0)
+            if sum_temp_hs == 0:
+                sum_temp_hs = 0.00001
+            hs[i] = temp_hs[i] / sum_temp_hs
+            if math.isnan(hs[i]):
+                print "BBBBBBBB"
 
         return hs
 
@@ -90,6 +95,8 @@ class GaussianGate(Gate):
 
         ms = list()
         for i in range(len(experts)):
+            if sum_hs[i] == 0:
+                sum_hs[i] = 0.0000001
             ms.append( (1 / sum_hs[i]) * sum_hs_x[i] )
 
         return ms
@@ -114,6 +121,8 @@ class GaussianGate(Gate):
 
         sigmas = list()
         for i in range(self.sigma.shape[0]):
+            if sum_hs[i] == 0:
+                sum_hs[i] = 0.000001
             sigmas.append( (1 / sum_hs[i]) * sum_hs_xm[i] )
 
         return sigmas
@@ -140,6 +149,9 @@ class GaussianGate(Gate):
             y = training_y[i]
 
             hs = self._compute_hs( [ newExpert, oldExpert ], x, y)
+            if math.isnan(hs[0]) or math.isnan(hs[1]):
+                continue
+
             if hs[0] > hs[1]:
                 htsum[0] += hs[0]
                 htxsum[0] += hs[0] * x
@@ -153,7 +165,7 @@ class GaussianGate(Gate):
     def update_weights_wls(self, experts, training_x, training_y):
         Cmat = np.zeros( (len(experts), training_x.shape[0], training_x.shape[0]) )
         Amat = np.zeros( (training_x.shape[0], training_x.shape[1]) )
-        yvec = np.zeros( (training_y.shape[0], training_y.shape[1]) )
+        yvec = np.zeros( (training_y.shape[0], 1) )
         for i in range(training_x.shape[0]):
             x = training_x[i]
             y = training_y[i]
@@ -165,8 +177,11 @@ class GaussianGate(Gate):
                 Cmat[j][i][i] = hs[j]
 
         for i, expert in enumerate(experts):
-            weights = np.linalg.inv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
-            expert.weights = np.transpose(weights)
+            try:
+                weights = np.linalg.pinv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
+                expert.weights = np.transpose(weights)
+            except np.linalg.LinAlgError:
+                print "Linalg Error"
 
 
 
@@ -184,7 +199,7 @@ class GaussianGate(Gate):
             for j in range(self.sigma[i].shape[0]):
                 for k in range(self.sigma[i].shape[0]):
                     if j != k: self.sigma[i][j][k] = 0
-                    elif j == k and self.sigma[i][j][k] < 0.01: self.sigma[i][j][k] = 0.01
+                    elif j == k and self.sigma[i][j][k] < 0.0001: self.sigma[i][j][k] = 0.0001
 
         for i, m in enumerate(new_ms):
             experts[i].setMean(m)

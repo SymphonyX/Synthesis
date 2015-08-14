@@ -29,10 +29,11 @@ class Expert:
         self.sum_hs += hs
 
     def normalizeError(self):
-        if self.sum_hs > 0:
-            self.error = self.error / self.sum_hs
-        else:
-            print "Expert sum_hs is 0. Cannot normalize error"
+        if self.sum_hs == 0:
+            self.sum_hs = 0.00001
+        self.error = self.error / self.sum_hs
+        # else:
+        #     print "Expert sum_hs is 0. Cannot normalize error"
 
     def computeExpertyhat(self, x):
         return self.weights.dot( np.transpose(x) )

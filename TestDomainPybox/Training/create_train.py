@@ -22,6 +22,9 @@ for i in pkls:
 	params = pickle.load(f)
 	output = ""
 	for j in range(params.shape[0]):
-		output += str(params[j]) + ", "
+		if j == params.shape[0]-1:
+			output += str(params[j])
+		else:
+			output += str(params[j]) + ", "
 	train.write(str(x)+", "+str(y)+"; "+output+"\n")
 

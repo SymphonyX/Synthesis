@@ -3,7 +3,6 @@ import math
 from SoftmaxGate import SoftmaxGate
 from GaussianGate import GaussianGate
 from Expert import Expert
-import scipy as sp
 from Plotter import Plotter
 
 from sklearn.preprocessing import PolynomialFeatures
@@ -41,8 +40,6 @@ def FourierFeatures(degree, feat):
                         count[0,k-1] = 0
                         count[0,k] += 1
     return new_feat
-
-
 
 
 
@@ -87,7 +84,7 @@ class MixtureOfExperts:
         self.training_iterations = 0
         self.experts = list()
         self.numExperts = num_experts
-        self.bestError = [float("inf")] * dimension_out
+        self.bestError = float("inf")
         for i in range(num_experts):
             location = np.ones( (dimension_in, 1) )
             for j in range(dimension_in):
@@ -101,7 +98,7 @@ class MixtureOfExperts:
     def computeExpertsOutputs(self, x):
         expertOutputs = list()
         [expertOutputs.append( expert.computeExpertyhat(x) ) for expert in self.experts]
-        expertOutputs = np.asarray( expertOutputs ).reshape(expertOutputs[0].size, len(expertOutputs))
+        expertOutputs = np.asarray( expertOutputs ).reshape(1, len(expertOutputs))
 
         return expertOutputs
 
@@ -173,7 +170,7 @@ class MixtureOfExperts:
                 self.gateNet.train(training_x, training_y, self.experts, learningRate)
                 learningRate *= 0.9
                 error, prediction = self.testMixture(test_x, test_y)
-                if  np.linalg.norm(self.bestError) - np.linalg.norm(error) > 0.000001:
+                if  self.bestError - error > 0.0001:
                     print "Error ", error
                     self._saveParameters(error)
                     self.numExperts += 1
@@ -215,27 +212,29 @@ class MixtureOfExperts:
                 [e.resetError() for e in self.experts]
                 last_error, prediction = self.testMixture(test_x, test_y, recordErrors=True)
 
-                print "Error: ", last_error, "Norm: ", np.linalg.norm(last_error)
-                if np.linalg.norm(last_error) < np.linalg.norm(self.bestError):
+                print "Error: ", last_error
+                if last_error < self.bestError:
                     self._saveParameters(last_error)
 
                 errors.append(last_error)
 
-                error_change = 1 if self.training_iterations < 5 else np.linalg.norm(errors[self.training_iterations-1]) - np.linalg.norm(errors[self.training_iterations])
+                error_change = 1 if self.training_iterations < 5 else errors[self.training_iterations-1] - errors[self.training_iterations]
                # print "CHANGE ", error_change
                 self.training_iterations += 1
-                # iterations += 1
-                # if iterations == maxIterations:
-                #    print "Max iterations reached"
-                #    break
-                if error_change < .000001:
-                    print "Min Error"
-                    break
+                iterations += 1
+                if iterations == maxIterations:
+                   print "Max iterations reached"
+                   break
+                # if error_change < .00001:
+                #     print "Min Error"
+                #     break
 
             [e.normalizeError() for e in self.experts]
             errorSorted = sorted(self.experts, key=lambda x:x.error, reverse=True)
 
-            keepGrowing = self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
+            if self.bestError < 0.0001:
+                break
+            keepGrowing = False#self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
         print "Final network %d experts" %(len(self.experts))
 
 
@@ -243,6 +242,8 @@ class MixtureOfExperts:
         self.gateNet.setToBestParams()
         for e in self.experts:
             e.setToBestWeights()
+
+
 
     def visualizePredictions(self, trainingdata, trainingoutput, testdata, testoutput, visMode):
         plotter = Plotter()
