@@ -95,47 +95,47 @@ def trainNetworks(options):
 
         training_yi = training_y[:,i].reshape( (training_y.shape[0], 1))
 
+        indexes = np.random.permutation(training_x.shape[0])
+        training_xi = training_x[indexes]
+        training_yi = training_yi[indexes]
 
         best_model_error = float("inf")
         best_model = None
-        for degree in range(1, 4):
+        # for degree in range(1, 4):
 
-            sum_errors = 0
-            for i in range(5):
-                mixExperts = MixtureOfExperts(experts, "em", "coop", training_x, training_yi, poly_degree=degree, feat_type="polynomial")
-                mixExperts.learningRate = learningRate
-                mixExperts.decay = decay
-
-                indexes = np.random.permutation(training_x.shape[0])
-                training_x = training_x[indexes]
-                training_yi = training_yi[indexes]
-
-                test_x = training_x[:training_x.shape[0]/2]
-                train_x = training_x[training_x.shape[0]/2:]
-                test_y = training_yi[:training_yi.shape[0]/2]
-                train_y = training_yi[training_yi.shape[0]/2:]
-
-                print "\n\nCross validation k: ", i, "-1\n\n"
-                mixExperts.training_iterations = 0
-                mixExperts.bestError = float("inf")
-                mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 20)
-                sum_errors += mixExperts.bestError
-
-                print "\n\nCross validation k: ", i, "-2\n\n"
-                mixExperts.training_iterations = 0
-                mixExperts.bestError = float("inf")
-                mixExperts.trainNetwork(test_x, test_y, train_x, train_y, 20)
-                sum_errors += mixExperts.bestError
-
-            if sum_errors < best_model_error:
-                best_model = mixExperts
-                best_model_error = sum_errors
-                print "New best model: degree ", degree
-                print "Error: ", best_model_error, "\n\n\n"
+            # sum_errors = 0
+            # for i in range(5):
+        mixExperts = MixtureOfExperts(experts, "em", "coop", training_x, training_yi, poly_degree=1, feat_type="polynomial")
+        mixExperts.learningRate = learningRate
+        mixExperts.decay = decay
 
 
-        best_model.setToBestParams()
-        networks.append( best_model )
+        test_x = training_xi[:training_xi.shape[0]/4]
+        train_x = training_xi[training_xi.shape[0]/4:]
+        test_y = training_yi[:training_yi.shape[0]/4]
+        train_y = training_yi[training_yi.shape[0]/4:]
+
+        # print "\n\nCross validation k: ", i, "-1\n\n"
+        # mixExperts.training_iterations = 0
+        # mixExperts.bestError = float("inf")
+        mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 30)
+            # sum_errors += mixExperts.bestError
+
+                # print "\n\nCross validation k: ", i, "-2\n\n"
+                # mixExperts.training_iterations = 0
+                # mixExperts.bestError = float("inf")
+                # mixExperts.trainNetwork(test_x, test_y, train_x, train_y, 20)
+                # sum_errors += mixExperts.bestError
+
+            # if sum_errors < best_model_error:
+            #     best_model = mixExperts
+            #     best_model_error = sum_errors
+            #     print "New best model: degree ", degree
+            #     print "Error: ", best_model_error, "\n\n\n"
+            #
+
+        mixExperts.setToBestParams()
+        networks.append(mixExperts )
 
     return networks, xmin, xmax, ymin, ymax
 
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     pygame.init()
     display = pygame.display.set_mode((width, height))
     fpsClock = pygame.time.Clock()
-    world = ResetWorld(origin, width, height, target_theta)
+    world = ResetWorld(origin, width, height, x, y)
 
 
     if options.load is not None:
@@ -203,6 +203,7 @@ if __name__ == "__main__":
     feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
     feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
 
+    all_params=[]
     for i, network in enumerate(networks):
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
@@ -240,7 +241,7 @@ if __name__ == "__main__":
     plt.plot(t3, x3, "g")
     plt.show()
 
-    RunSimulation(world, x1, x2, x3, display, height, target_theta, dt, fpsClock, FPS)
+    RunSimulation(world, x1, x2, x3, display, height, x, y, dt, fpsClock, FPS)
 
 
 

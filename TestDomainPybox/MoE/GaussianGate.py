@@ -36,19 +36,23 @@ class GaussianGate(Gate):
         for expert in experts:
             sigma_i = self.sigma[expert.index]
             m_i = expert.mean()
+            if math.isnan(m_i[0,0]):
+                print "a"
             xm_diff = x - m_i
             mult = -0.5 * (xm_diff.dot(np.linalg.inv(sigma_i)).dot(np.transpose(xm_diff)))
             prod = math.pow((2*math.pi), -n/2) * math.pow(np.linalg.det(sigma_i), -1/2)
+            if mult < -100:
+                mult = -100
             px_given_vj = prod * math.exp(mult)
             px_times_alpha.append( (px_given_vj * self.alphas[expert.index]) )
 
 
         params = np.random.random( (len(experts), 1) )
+        sum_px = sum(px_times_alpha)
         for i in range(params.shape[0]):
-            sum_px = sum(px_times_alpha)
-            if sum_px == 0:
-                sum_px = 0.00001
             params[i] = px_times_alpha[i] / sum_px
+            if math.isnan(params[i]):
+                print "A"
 
 
         return np.transpose(params)[0]
@@ -61,16 +65,17 @@ class GaussianGate(Gate):
         for i, expert in enumerate(experts):
             expertOutput = expert.computeExpertyhat(x)
             exponent = -0.5 * np.transpose((y - expertOutput)).dot((y - expertOutput))
+            if exponent < -100:
+                exponent = -100
             g_xv = self.outputs(experts, x)
             temp_hs[i] = g_xv[i] * math.exp( exponent )
 
+
         for i in range(temp_hs.shape[0]):
             sum_temp_hs = np.sum(temp_hs, axis=0)
-            if sum_temp_hs == 0:
-                sum_temp_hs = 0.00001
             hs[i] = temp_hs[i] / sum_temp_hs
-            if math.isnan(hs[i]):
-                print "BBBBBBBB"
+            if sum_temp_hs == 0:
+                print "b"
 
         return hs
 
@@ -95,8 +100,6 @@ class GaussianGate(Gate):
 
         ms = list()
         for i in range(len(experts)):
-            if sum_hs[i] == 0:
-                sum_hs[i] = 0.0000001
             ms.append( (1 / sum_hs[i]) * sum_hs_x[i] )
 
         return ms
@@ -121,8 +124,6 @@ class GaussianGate(Gate):
 
         sigmas = list()
         for i in range(self.sigma.shape[0]):
-            if sum_hs[i] == 0:
-                sum_hs[i] = 0.000001
             sigmas.append( (1 / sum_hs[i]) * sum_hs_xm[i] )
 
         return sigmas
@@ -176,12 +177,15 @@ class GaussianGate(Gate):
             for j in range(len(experts)):
                 Cmat[j][i][i] = hs[j]
 
+        return_weights = []
         for i, expert in enumerate(experts):
-            try:
-                weights = np.linalg.pinv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
-                expert.weights = np.transpose(weights)
-            except np.linalg.LinAlgError:
-                print "Linalg Error"
+            # try:
+            weights = np.linalg.inv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
+            return_weights.append( np.transpose(weights) )
+            # except np.linalg.LinAlgError:
+            #     print "Linalg Error"
+
+        return return_weights
 
 
 
@@ -193,18 +197,21 @@ class GaussianGate(Gate):
         new_ms = self._update_ms(experts, training_x, training_y)
         new_sigmas = self._update_sigma(experts, training_x, training_y)
 
+        new_weights = self.update_weights_wls(experts, training_x, training_y)
+
+        for i, expert in enumerate(experts):
+            expert.weights = new_weights[i]
+
         self.alphas = new_alphas
         for i, s in enumerate(new_sigmas):
             self.sigma[i] = s
             for j in range(self.sigma[i].shape[0]):
                 for k in range(self.sigma[i].shape[0]):
                     if j != k: self.sigma[i][j][k] = 0
-                    elif j == k and self.sigma[i][j][k] < 0.0001: self.sigma[i][j][k] = 0.0001
+                    elif j == k and self.sigma[i][j][k] < 0.001: self.sigma[i][j][k] = 0.001
 
         for i, m in enumerate(new_ms):
             experts[i].setMean(m)
-
-        self.update_weights_wls(experts, training_x, training_y)
 
         thetas = []
         for i, expert in enumerate(experts):

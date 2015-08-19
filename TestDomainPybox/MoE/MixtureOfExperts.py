@@ -234,7 +234,7 @@ class MixtureOfExperts:
 
             if self.bestError < 0.0001:
                 break
-            keepGrowing = False#self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
+            keepGrowing = self.growNetwork(errorSorted, training_x, training_y, test_x, test_y)
         print "Final network %d experts" %(len(self.experts))
 
 

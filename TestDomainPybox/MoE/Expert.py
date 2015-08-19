@@ -15,6 +15,8 @@ class Expert:
         self.index = expertIndex
 
     def mean(self):
+        if len(self.location.shape) == 1:
+            self.location = self.location.reshape( (self.location.shape[0], 1) )
         return np.transpose(self.location)
 
     def setMean(self, mean):

@@ -16,11 +16,11 @@ arm_color = (50, 50, 50, 200) # fourth value specifies transparency
 
 class DomainObject:
 
-    def __init__(self, position, color, radius, world, target_theta, screen_height):
+    def __init__(self, position, color, radius, world, x, y, screen_height):
         self.position = position
         self.target_radius = 200
-        self.target_position = (int(position[0]+(self.target_radius*math.cos(target_theta))),
-                                int(position[1]+(self.target_radius*math.sin(target_theta))))
+        self.target_position = (int(position[0]+x),
+                                int(position[1]-y))
         self.color = color
         self.radius = radius
 
@@ -48,9 +48,9 @@ class DomainObject:
         pygame.draw.circle(display, (0, 255, 0, 0), self.target_position, 10)
 
 
-def ResetWorld(arm_origin, width, height, target_theta):
+def ResetWorld(arm_origin, width, height, xpos, ypos):
     world = b2World(gravity=(0,0), doSleep=True)
-    world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world, target_theta=target_theta, screen_height=height)
+    world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world, x=xpos, y=ypos, screen_height=height)
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
     world.arm.createBodies(world)
     return world
@@ -173,7 +173,7 @@ def UndesiredContact(world):
     return False
 
 
-def RunSimulation(world, x1, x2 ,x3, display, height, target_theta, dt, fpsClock, FPS):
+def RunSimulation(world, x1, x2 ,x3, display, height, x, y, dt, fpsClock, FPS):
 
     thetas_reached = True
     step = 0
@@ -205,7 +205,7 @@ def RunSimulation(world, x1, x2 ,x3, display, height, target_theta, dt, fpsClock
         print "Error: ", error
 
         font = pygame.font.SysFont('Arial', 25)
-        display.blit(font.render('Goal: pi = ' + str(target_theta), True, (0,0,0)), (200, 100))
+        display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
         display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
 
         pygame.display.flip()

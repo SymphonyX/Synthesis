@@ -16,7 +16,6 @@ train = open("train.txt", "w")
 
 for i in pkls:
 	val = i.split(".")[0]
-	print val
 	x = 200 * math.cos(float(val[0]+"."+val[1]))
 	y = -200 * math.sin( float(val[0]+"."+val[1]))
 	f = open(i, "r")
@@ -27,5 +26,6 @@ for i in pkls:
 			output += str(params[j])
 		else:
 			output += str(params[j]) + ", "
-	train.write(str(x)+", "+str(y)+"; "+output+"\n")
+	#train.write(str(x)+", "+str(y)+"; "+output+"\n")
+	train.write(str(x)+", "+str(y)+", "+val[0]+"."+val[1]+"; "+output+"\n")
 

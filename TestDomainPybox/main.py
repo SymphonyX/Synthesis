@@ -32,7 +32,8 @@ fpsClock = None
 best_error = float("inf")
 best_params = None
 best_distance = float("inf")
-target_theta = math.pi
+target_x = 0.0
+target_y = 0.0
 
 
 
@@ -50,7 +51,7 @@ def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
 
 def error_func(x):
 
-    world = ResetWorld(origin, width, height, target_theta)
+    world = ResetWorld(origin, width, height, target_x, target_y)
     step = 0
 
     dmp1 = DMP(basis, K, D, world.arm.joint1.angle, x[0])
@@ -135,7 +136,6 @@ def error_func(x):
         total_error += math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
         total_steps += 1
 
-    #total_error =  (1000*error) + tool_distance  + penalty + 0.1*traveled_distance + 0.1*sum_distances#( 5 * (np.linalg.norm(all_pos[0]) + np.linalg.norm(all_pos[1])))
     cost = (1000 * (total_error/total_steps)) + ( 100.0 * np.linalg.norm(x))
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
@@ -184,12 +184,14 @@ if __name__ == '__main__':
     parser = OptionParser(usage)
     parser.add_option("-s", "--save", action="store", help="save param file", type="string")
     parser.add_option("-l", "--load", action="store", help="load param file", type="string")
-    parser.add_option("-t", "--target", action="store", help="target angle", type="float")
+    parser.add_option("-x", "--xpos", action="store", help="target x", type="float")
+    parser.add_option("-y", "--ypos", action="store", help="target y", type="float")
     parser.add_option("-p", "--params", action="store", help="parameters initial values", type="string")
 
 
     (options, args) = parser.parse_args()
-    target_theta = 0.0 if options.target is None else options.target
+    target_x = 200.0 if options.xpos is None else options.xpos
+    target_y = 0.0 if options.ypos is None else options.ypos
 
     K = 50.0
     D = 10.0
@@ -201,7 +203,7 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 20
+        outer_iter = 1 if options.params is not None else 5
         for j in range(outer_iter):
             iterations = 5
             if options.params is not None:
@@ -246,7 +248,7 @@ if __name__ == '__main__':
     pygame.init()
     display = pygame.display.set_mode((width, height))
     fpsClock = pygame.time.Clock()
-    world = ResetWorld(origin, width, height, target_theta)
+    world = ResetWorld(origin, width, height, target_x, target_y)
 
 
     dmp1 = DMP(basis, K, D, world.arm.joint1.angle, result[0])
@@ -280,4 +282,4 @@ if __name__ == '__main__':
     plt.plot(t3, x3, "g")
     plt.show()
 
-    RunSimulation(world, x1, x2, x3, display, height, target_theta, dt, fpsClock, FPS)
+    RunSimulation(world, x1, x2, x3, display, height, target_x, target_y, dt, fpsClock, FPS)
