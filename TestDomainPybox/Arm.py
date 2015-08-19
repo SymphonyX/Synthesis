@@ -27,9 +27,11 @@ class Arm:
         self.link1.pos = [ (self.basex, self.basey) ]
         self.link2.pos = [ (self.basex, self.basey-self.link1.length+10) ]
 
+        vertices1 = [(-self.link1.line_width/2.0, -self.link1.length/2.0), (-self.link1.line_width/2.0, self.link1.length/2.0), (self.link1.line_width/2.0, self.link1.length/2.0), (self.link1.line_width/2.0, -self.link1.length/2.0)]
+        vertices2 = [(-self.link2.line_width/2.0, -self.link2.length/2.0), (-self.link2.line_width/2.0, self.link2.length/2.0), (self.link2.line_width/2.0, self.link2.length/2.0), (self.link2.line_width/2.0, -self.link2.length/2.0)]
 
-        self.link1.createBody(world, "link1", density=1.5)
-        self.link2.createBody(world, "link2", density=1.0)
+        self.link1.createBody(world, vertices1, "link1", density=1.5)
+        self.link2.createBody(world, vertices2, "link2", density=1.0)
 
 
         self.set_pivot_positions()
