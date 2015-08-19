@@ -23,15 +23,25 @@ class Arm:
         self.basex = basex
         self.basey = basey
 
+        self.l2_angle = 2.5
+
     def createBodies(self, world):
         self.link1.pos = [ (self.basex, self.basey) ]
-        self.link2.pos = [ (self.basex, self.basey-self.link1.length+10) ]
+        self.link2.pos = [ (self.basex+self.link1.length-20, self.basey-10) ]
 
-        vertices1 = [(-self.link1.line_width/2.0, -self.link1.length/2.0), (-self.link1.line_width/2.0, self.link1.length/2.0), (self.link1.line_width/2.0, self.link1.length/2.0), (self.link1.line_width/2.0, -self.link1.length/2.0)]
-        vertices2 = [(-self.link2.line_width/2.0, -self.link2.length/2.0), (-self.link2.line_width/2.0, self.link2.length/2.0), (self.link2.line_width/2.0, self.link2.length/2.0), (self.link2.line_width/2.0, -self.link2.length/2.0)]
+        vertices1 = [(-self.link1.length/2.0, -self.link1.line_width/2.0), (self.link1.length/2.0, -self.link1.line_width/2.0), (self.link1.length/2.0, self.link1.line_width/2.0), (-self.link1.length/2.0, self.link1.line_width/2.0)]
+        vertices2 = [(-self.link2.length/2.0, -self.link2.line_width/2.0), (self.link2.length/2.0, -self.link2.line_width/2.0), (self.link2.length/2.0, self.link2.line_width/2.0), (-self.link2.length/2.0, self.link2.line_width/2.0)]
+
+
+        rotated_vertices2 = []
+        for vertex in vertices2:
+            new_vertex = (((vertex[0] - (vertices2[0][0])) * math.cos(self.l2_angle)) - ((vertex[1] - ((vertices2[3][1]-vertices2[0][1])/2)) * math.sin(self.l2_angle)) + (vertices2[0][0]), \
+                          ((vertex[0] - (vertices2[0][0])) * math.sin(self.l2_angle)) + ((vertex[1] - ((vertices2[3][1]-vertices2[0][1])/2)) * math.cos(self.l2_angle)) + ((vertices2[3][1]-vertices2[0][1])/2) )
+
+            rotated_vertices2.append( new_vertex )
 
         self.link1.createBody(world, vertices1, "link1", density=1.5)
-        self.link2.createBody(world, vertices2, "link2", density=1.0)
+        self.link2.createBody(world, rotated_vertices2, "link2", density=1.0)
 
 
         self.set_pivot_positions()
@@ -42,21 +52,21 @@ class Arm:
         self.pivot1.userData = "pivot1"
 
         self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-5.5, upperAngle=0.2)
 
         self.tool = Tool(self.pivot_position3[0], self.pivot_position3[1], world, 100.0)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=0.0, upperAngle=math.pi)
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/4.0, upperAngle=(3.0/4.0)*math.pi)
 
 
 
     def set_pivot_positions(self):
-        self.pivot_position1 = (self.basex, self.basey+self.link1.length/2.0)
+        self.pivot_position1 = (self.basex-self.link1.length/2.0, self.basey)
 
-        self.pivot_position2 = (self.pivot_position1[0]+(self.link1.length * math.sin(self.link1.body.angle)), \
-                                                         self.pivot_position1[1]-(self.link1.length * math.cos(self.link1.body.angle)))
+        self.pivot_position2 = (self.pivot_position1[0]+(self.link1.length * math.cos(self.link1.body.angle)), \
+                                                         self.pivot_position1[1]+(self.link1.length * math.sin(self.link1.body.angle)))
 
-        self.pivot_position3 = (self.pivot_position2[0]+((self.link2.length-2) * math.sin(self.link2.body.angle)), \
-                                                         self.pivot_position2[1]-((self.link2.length-2) * math.cos(self.link2.body.angle))-10)
+        self.pivot_position3 = (self.pivot_position2[0]+((self.link2.length-2) * math.cos(self.l2_angle))+15, \
+                                                         self.pivot_position2[1]+((self.link2.length-2) * math.sin(self.l2_angle)))
 
 
     def move_arm_absolute(self, theta1, theta2):

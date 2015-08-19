@@ -21,7 +21,7 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2, (height / 4)*3 - 550)
+origin = (width / 2 + 120, (height / 4)*3 - 350)
 dmp_dt = 0.2
 fpsClock = None
 
@@ -199,9 +199,10 @@ if __name__ == "__main__":
 
 
     parameters = []
-    feat = np.zeros( (1, 2) )
+    feat = np.zeros( (1, 3) )
     feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
     feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
+    feat[0,2] = target_theta
 
     all_params=[]
     for i, network in enumerate(networks):
