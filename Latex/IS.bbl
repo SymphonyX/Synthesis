@@ -1,0 +1,34 @@
+\begin{thebibliography}{1}
+
+\bibitem{4399481}
+S.~Hart and R.~Grupen.
+\newblock Natural task decomposition with intrinsic potential fields.
+\newblock In {\em Intelligent Robots and Systems, 2007. IROS 2007. IEEE/RSJ
+  International Conference on}, pages 2507--2512, Oct 2007.
+
+\bibitem{Huber00ahybrid}
+Manfred Huber.
+\newblock A hybrid architecture for adaptive robot control, 2000.
+
+\bibitem{Pastor:2009:LGM:1703435.1703645}
+Peter Pastor, Heiko Hoffmann, Tamim Asfour, and Stefan Schaal.
+\newblock Learning and generalization of motor skills by learning from
+  demonstration.
+\newblock In {\em Proceedings of the 2009 IEEE International Conference on
+  Robotics and Automation}, ICRA'09, pages 1293--1298, Piscataway, NJ, USA,
+  2009. IEEE Press.
+
+\bibitem{1044003}
+R.~Platt, A.H. Fagg, and R.A. Grupen.
+\newblock Nullspace composition of control laws for grasping.
+\newblock In {\em Intelligent Robots and Systems, 2002. IEEE/RSJ International
+  Conference on}, volume~2, pages 1717--1723 vol.2, 2002.
+
+\bibitem{Schaal_TISAMAM_2003}
+S.~Schaal.
+\newblock Dynamic movement primitives - a framework for motor control in humans
+  and humanoid robots.
+\newblock In {\em The International Symposium on Adaptive Motion of Animals and
+  Machines}, 2003.
+
+\end{thebibliography}
