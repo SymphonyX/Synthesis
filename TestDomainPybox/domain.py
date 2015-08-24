@@ -7,7 +7,7 @@ from PID import PID
 
 PD1 = PID(P=100.0, I=0.0, D=15000.0)
 PD2 = PID(P=100.0, I=0.0, D=18000.0)
-PD3 = PID(P=100.0, I=0.0, D=18000.0)
+PD3 = PID(P=100.0, I=0.0, D=20000.0)
 
 black = (0, 0, 0)
 white = (255, 255, 255)
@@ -177,6 +177,7 @@ def RunSimulation(world, x1, x2 ,x3, display, height, x, y, dt, fpsClock, FPS):
 
     thetas_reached = True
     step = 0
+    pd_step = 0
     while step < len(x1) or thetas_reached == False:
         display.fill(white)
 
@@ -185,9 +186,14 @@ def RunSimulation(world, x1, x2 ,x3, display, height, x, y, dt, fpsClock, FPS):
             step += 1
             thetas_reached = False
             contact = 0
+            pd_step = 0
         else:
             thetas_reached = MoveJointsIteration(world.arm.joint1, world.arm.joint2, world.arm.joint3, printing=True)
+            if pd_step == 1:
+                pd_step = 0
+                thetas_reached = True
 
+        pd_step += 1
         UpdateScreen(world, display, height, arm_color)
 
         # check for quit

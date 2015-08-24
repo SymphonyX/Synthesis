@@ -25,8 +25,8 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2, (height / 4)*3 - 550)
-dmp_dt = 0.2
+origin = (width / 2 + 120, (height / 4)*3 - 350)
+dmp_dt = 0.001
 fpsClock = None
 
 best_error = float("inf")
@@ -91,6 +91,7 @@ def error_func(x):
     penalty = 0
     total_error = 0.0
     total_steps = 0
+    pd_step = 0
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
         prev_pos = world.domain_object.body.position.copy()
@@ -99,12 +100,16 @@ def error_func(x):
             step += 1
             thetas_reached = False
             contact = 0
+            pd_step = 0
         else:
             thetas_reached = MoveJointsIteration(world.arm.joint1, world.arm.joint2, world.arm.joint3)
+            if pd_step == 1:
+                thetas_reached = True
+                pd_step = 0
             tool_distance += math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
                                  + (world.domain_object.body.position[1] - world.arm.tool.body2.position[1])**2 ) #TODO this is only checking against the center
 
-
+        pd_step += 1
         world.Step(dt, 20, 20)
         world.ClearForces()
         traveled_distance += math.sqrt( (prev_pos[0] - world.domain_object.body.position[0])**2 + (prev_pos[1] - world.domain_object.body.position[1])**2)
@@ -186,12 +191,17 @@ if __name__ == '__main__':
     parser.add_option("-l", "--load", action="store", help="load param file", type="string")
     parser.add_option("-x", "--xpos", action="store", help="target x", type="float")
     parser.add_option("-y", "--ypos", action="store", help="target y", type="float")
+    parser.add_option("-t", "--theta", action="store", help="target theta", type="float")
     parser.add_option("-p", "--params", action="store", help="parameters initial values", type="string")
 
 
     (options, args) = parser.parse_args()
-    target_x = 200.0 if options.xpos is None else options.xpos
-    target_y = 0.0 if options.ypos is None else options.ypos
+    if options.theta is not None:
+        target_x = 200 * math.cos(options.theta)
+        target_y = 200 * math.sin(options.theta)
+    else:
+        target_x = 200.0 if options.xpos is None else options.xpos
+        target_y = 0.0 if options.ypos is None else options.ypos
 
     K = 50.0
     D = 10.0
