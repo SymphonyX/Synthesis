@@ -98,7 +98,7 @@ class MixtureOfExperts:
     def computeExpertsOutputs(self, x):
         expertOutputs = list()
         [expertOutputs.append( expert.computeExpertyhat(x) ) for expert in self.experts]
-        expertOutputs = np.asarray( expertOutputs ).reshape(1, len(expertOutputs))
+        expertOutputs = np.asarray( expertOutputs ).reshape(expertOutputs[0].size, len(expertOutputs))
 
         return expertOutputs
 
@@ -170,9 +170,11 @@ class MixtureOfExperts:
                 self.gateNet.train(training_x, training_y, self.experts, learningRate)
                 learningRate *= 0.9
                 error, prediction = self.testMixture(test_x, test_y)
-                if  self.bestError - error > 0.0001:
-                    print "Error ", error
-                    self._saveParameters(error)
+                avg_error = sum(error) / len(error)
+                if  self.bestError - avg_error > 0.0001:
+                    print "Error ", avg_error
+                    print "Errors: ", error
+                    self._saveParameters(avg_error)
                     self.numExperts += 1
                     print "Adding new expert!"
                     return True
@@ -211,12 +213,14 @@ class MixtureOfExperts:
 
                 [e.resetError() for e in self.experts]
                 last_error, prediction = self.testMixture(test_x, test_y, recordErrors=True)
+                avg_error = sum(last_error) / len(last_error)
 
-                print "Error: ", last_error
-                if last_error < self.bestError:
-                    self._saveParameters(last_error)
+                print "Errors: ", last_error
+                print "Error: ", avg_error
+                if avg_error < self.bestError:
+                    self._saveParameters(avg_error)
 
-                errors.append(last_error)
+                errors.append(avg_error)
 
                 error_change = 1 if self.training_iterations < 5 else errors[self.training_iterations-1] - errors[self.training_iterations]
                # print "CHANGE ", error_change

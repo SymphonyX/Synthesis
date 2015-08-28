@@ -26,7 +26,7 @@ height = 1000
 FPS = 60
 dt = 1.0 / FPS
 origin = (width / 2 + 120, (height / 4)*3 - 350)
-dmp_dt = 0.001
+dmp_dt = 0.002
 fpsClock = None
 
 best_error = float("inf")
@@ -92,6 +92,7 @@ def error_func(x):
     total_error = 0.0
     total_steps = 0
     pd_step = 0
+    goal_reach_step = 0
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
         prev_pos = world.domain_object.body.position.copy()
@@ -138,10 +139,16 @@ def error_func(x):
             break
 
 
-        total_error += math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+        current_error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+        total_error += current_error
         total_steps += 1
 
-    cost = (1000 * (total_error/total_steps)) + ( 100.0 * np.linalg.norm(x))
+        if current_error < 20.0 and goal_reach_step == 0:
+            goal_reach_step = total_steps
+
+
+    #cost = (1000 * (total_error/total_steps)) + ( 100.0 * np.linalg.norm(x)) + (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+    cost = (1000 * total_error) + (100 * sum_distances) + (100 * (total_steps - goal_reach_step))#		
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
     global best_error
@@ -221,8 +228,8 @@ if __name__ == '__main__':
                     params_file = open(options.params, "r")
                     params = pickle.load(params_file)
                 epsilons = np.zeros( (basis*3+3) )
-                epsilons[:3] = 10.5
-                epsilons[3:] = 50.5
+                epsilons[:3] = 0.5
+                epsilons[3:] = 0.5
                 iterations = 10
             elif options.params is None:
                 params = np.random.uniform( -10, 10, (basis*3+3, 1) )

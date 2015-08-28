@@ -22,7 +22,7 @@ height = 1000
 FPS = 60
 dt = 1.0 / FPS
 origin = (width / 2 + 120, (height / 4)*3 - 350)
-dmp_dt = 0.001
+dmp_dt = 0.002
 fpsClock = None
 
 
@@ -79,7 +79,7 @@ def generateTrainingData(filename):
     training_x, xmin, xmax = normalize_data(training_x)
     training_y, ymin, ymax = normalize_data(training_y)
 
-    return training_x, training_y, xmin, xmax, ymin, ymax
+    return training_x, training_y, np.asarray(xmin), np.asarray(xmax), np.asarray(ymin), np.asarray(ymax)
 
 def trainNetworks(options):
     experts = 1 if options.num is None else options.num
@@ -90,35 +90,35 @@ def trainNetworks(options):
     training_x, training_y, xmin, xmax, ymin, ymax = generateTrainingData(options.train)
 
     networks = []
-    for i in range(training_y.shape[1]):
-        print "Training network ", i, "\n"
+    # for i in range(training_y.shape[1]):
+    #     print "Training network ", i, "\n"
+    #
+    #     training_yi = training_y[:,i].reshape( (training_y.shape[0], 1))
 
-        training_yi = training_y[:,i].reshape( (training_y.shape[0], 1))
+    indexes = np.random.permutation(training_x.shape[0])
+    training_x = training_x[indexes]
+    training_y = training_y[indexes]
 
-        indexes = np.random.permutation(training_x.shape[0])
-        training_xi = training_x[indexes]
-        training_yi = training_yi[indexes]
+    best_model_error = float("inf")
+    best_model = None
+    # for degree in range(1, 4):
 
-        best_model_error = float("inf")
-        best_model = None
-        # for degree in range(1, 4):
-
-            # sum_errors = 0
-            # for i in range(5):
-        mixExperts = MixtureOfExperts(experts, "em", "coop", training_x, training_yi, poly_degree=1, feat_type="polynomial")
-        mixExperts.learningRate = learningRate
-        mixExperts.decay = decay
+        # sum_errors = 0
+        # for i in range(5):
+    mixExperts = MixtureOfExperts(experts, "em", "coop", training_x, training_y, poly_degree=1, feat_type="polynomial")
+    mixExperts.learningRate = learningRate
+    mixExperts.decay = decay
 
 
-        test_x = training_xi[:training_xi.shape[0]/4]
-        train_x = training_xi[training_xi.shape[0]/4:]
-        test_y = training_yi[:training_yi.shape[0]/4]
-        train_y = training_yi[training_yi.shape[0]/4:]
+    test_x = training_x[:training_x.shape[0]/4]
+    train_x = training_x[training_x.shape[0]/4:]
+    test_y = training_y[:training_y.shape[0]/4]
+    train_y = training_y[training_y.shape[0]/4:]
 
         # print "\n\nCross validation k: ", i, "-1\n\n"
         # mixExperts.training_iterations = 0
         # mixExperts.bestError = float("inf")
-        mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 30)
+    mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 30)
             # sum_errors += mixExperts.bestError
 
                 # print "\n\nCross validation k: ", i, "-2\n\n"
@@ -134,8 +134,8 @@ def trainNetworks(options):
             #     print "Error: ", best_model_error, "\n\n\n"
             #
 
-        mixExperts.setToBestParams()
-        networks.append(mixExperts )
+    mixExperts.setToBestParams()
+    networks.append(mixExperts )
 
     return networks, xmin, xmax, ymin, ymax
 
@@ -174,7 +174,7 @@ if __name__ == "__main__":
 
     target_theta = 0.0 if options.goal is None else options.goal
 
-    y = -200 * math.sin(target_theta)
+    y = 200 * math.sin(target_theta)
     x = 200 * math.cos(target_theta)
 
     pygame.init()
@@ -208,8 +208,9 @@ if __name__ == "__main__":
     for i, network in enumerate(networks):
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
-        prediction = (prediction * (ymax[i] - ymin[i])) + ymin[i]
-        parameters.append(prediction)
+        prediction = (prediction * (ymax - ymin)) + ymin
+        #parameters.append(prediction)
+        parameters = prediction
 
 
     dmp1 = DMP(basis, K, D, world.arm.joint1.angle, parameters[0])

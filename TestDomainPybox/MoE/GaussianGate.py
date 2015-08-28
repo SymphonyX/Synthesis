@@ -62,8 +62,12 @@ class GaussianGate(Gate):
         temp_hs = np.zeros( (len(experts), 1) )
         hs = np.zeros( (len(experts), 1) )
 
+        y = np.transpose(y)
         for i, expert in enumerate(experts):
             expertOutput = expert.computeExpertyhat(x)
+            if expertOutput.shape != y.shape:
+                raise Exception("Output shape does not align")
+
             exponent = -0.5 * np.transpose((y - expertOutput)).dot((y - expertOutput))
             if exponent < -100:
                 exponent = -100
@@ -166,7 +170,7 @@ class GaussianGate(Gate):
     def update_weights_wls(self, experts, training_x, training_y):
         Cmat = np.zeros( (len(experts), training_x.shape[0], training_x.shape[0]) )
         Amat = np.zeros( (training_x.shape[0], training_x.shape[1]) )
-        yvec = np.zeros( (training_y.shape[0], 1) )
+        yvec = np.zeros( (training_y.shape[0], training_y.shape[1]) )
         for i in range(training_x.shape[0]):
             x = training_x[i]
             y = training_y[i]
@@ -179,11 +183,11 @@ class GaussianGate(Gate):
 
         return_weights = []
         for i, expert in enumerate(experts):
-            # try:
-            weights = np.linalg.inv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
-            return_weights.append( np.transpose(weights) )
-            # except np.linalg.LinAlgError:
-            #     print "Linalg Error"
+            try:
+                weights = np.linalg.pinv( np.transpose(Amat).dot(Cmat[i]).dot(Amat) ).dot(np.transpose(Amat)).dot(Cmat[i]).dot(yvec)
+                return_weights.append( np.transpose(weights) )
+            except np.linalg.LinAlgError:
+                print "Linalg Error"
 
         return return_weights
 
