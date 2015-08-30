@@ -27,34 +27,34 @@ if __name__ == "__main__":
     ymax = data[4]
 
     files = os.listdir(sys.argv[1])
-    pkls = []
+    pkls, thetas = [], []
 
     for f in files:
         fi = f.split(".")
         if fi[-1] == "pkl":
             pkls.append(f)
+            thetas.append( float(fi[0][0]+"."+fi[0][1]) )
 
     pkls.sort()
-
-    thetas = np.linspace(0.0, 6.2, num=63)
-
+    thetas.sort()
 
     parameters = []
     actual_parameters = []
 
     for theta in thetas:
-        y = -200 * math.sin(theta)
+        y = 200 * math.sin(theta)
         x = 200 * math.cos(theta)
-        feat = np.zeros( (1, 2) )
+        feat = np.zeros( (1, 3) )
         feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
         feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
+        feat[0,2] = theta
 
         all_params=[]
         for i, network in enumerate(networks):
             new_feat = network.transform_features(feat)
             prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
-            prediction = (prediction * (ymax[i] - ymin[i])) + ymin[i]
-            all_params.append(prediction)
+            prediction = (prediction * (ymax - ymin)) + ymin
+            all_params = prediction
 
         parameters.append(all_params)
 

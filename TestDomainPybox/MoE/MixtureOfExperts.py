@@ -222,16 +222,16 @@ class MixtureOfExperts:
 
                 errors.append(avg_error)
 
-                error_change = 1 if self.training_iterations < 5 else errors[self.training_iterations-1] - errors[self.training_iterations]
+                error_change = 1 if self.training_iterations < 5 else math.fabs(errors[self.training_iterations-1] - errors[self.training_iterations])
                # print "CHANGE ", error_change
                 self.training_iterations += 1
                 iterations += 1
                 if iterations == maxIterations:
                    print "Max iterations reached"
                    break
-                # if error_change < .00001:
-                #     print "Min Error"
-                #     break
+                if error_change < .00001:
+                    print "Min Error"
+                    break
 
             [e.normalizeError() for e in self.experts]
             errorSorted = sorted(self.experts, key=lambda x:x.error, reverse=True)

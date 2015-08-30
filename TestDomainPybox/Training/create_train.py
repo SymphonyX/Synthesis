@@ -26,6 +26,7 @@ for i in pkls:
 			output += str(params[j])
 		else:
 			output += str(params[j]) + ", "
+	# train.write(val[0]+"."+val[1]+"; "+output+"\n")
 	#train.write(str(x)+", "+str(y)+"; "+output+"\n")
 	train.write(str(x)+", "+str(y)+", "+val[0]+"."+val[1]+"; "+output+"\n")
 
