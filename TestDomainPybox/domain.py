@@ -5,9 +5,9 @@ from Box2D import *
 from Arm import Arm
 from PID import PID
 
-PD1 = PID(P=100.0, I=0.0, D=15000.0)
-PD2 = PID(P=100.0, I=0.0, D=18000.0)
-PD3 = PID(P=100.0, I=0.0, D=20000.0)
+PD1 = PID(P=2000.0, I=0.0, D=25000.0)
+PD2 = PID(P=1500.0, I=0.0, D=35000.0)
+PD3 = PID(P=1000.0, I=0.0, D=45000.0)
 
 black = (0, 0, 0)
 white = (255, 255, 255)
@@ -20,7 +20,7 @@ class DomainObject:
         self.position = position
         self.target_radius = 200
         self.target_position = (int(position[0]+x),
-                                int(position[1]-y))
+                                int(screen_height-position[1]+y))
         self.color = color
         self.radius = radius
 
@@ -45,7 +45,7 @@ class DomainObject:
         # vertices=[(v[0], height-v[1]) for v in vertices]
         pygame.draw.circle(display, self.color, (int(self.body.position[0]), screen_height-int(self.body.position[1])), 20)
         pygame.draw.circle(display, self.color, self.position, self.target_radius, 10)
-        pygame.draw.circle(display, (0, 255, 0, 0), self.target_position, 10)
+        pygame.draw.circle(display, (0, 255, 0, 0), (int(self.target_position[0]), int(screen_height-self.target_position[1])), 10)
 
 
 def ResetWorld(arm_origin, width, height, xpos, ypos):
@@ -145,7 +145,7 @@ def MoveJointsIteration(joint1, joint2, joint3, printing=False):
         print "Speeds: ", speed1, speed2, speed3
         print "\n\n"
 
-    if math.fabs(error1) < 0.2 and math.fabs(error2) < 0.2 and math.fabs(error3) < 0.2:
+    if math.fabs(error1) < 0.1 and math.fabs(error2) < 0.1 and math.fabs(error3) < 0.1:
         return True
     return False
 
@@ -173,25 +173,30 @@ def UndesiredContact(world):
     return False
 
 
-def RunSimulation(world, x1, x2 ,x3, display, height, x, y, dt, fpsClock, FPS):
+def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
 
     thetas_reached = True
     step = 0
     pd_step = 0
+    curx, cury = 0, 0
     while step < len(x1) or thetas_reached == False:
         display.fill(white)
 
+
         if thetas_reached == True:
-            SetJointsIteration(x1[step], x2[step], x3[step], world)
+            theta1, theta2, theta3 = world.arm.inverse_kinematics_ccd(x1[step], x2[step])
+            curx = x1[step]
+            cury = x2[step]
+            SetJointsIteration(theta1, theta2, theta3, world)
             step += 1
             thetas_reached = False
             contact = 0
             pd_step = 0
         else:
             thetas_reached = MoveJointsIteration(world.arm.joint1, world.arm.joint2, world.arm.joint3, printing=True)
-            if pd_step == 1:
-                pd_step = 0
-                thetas_reached = True
+            # if pd_step == 1:
+            #     pd_step = 0
+            #     thetas_reached = True
 
         pd_step += 1
         UpdateScreen(world, display, height, arm_color)
@@ -206,13 +211,16 @@ def RunSimulation(world, x1, x2 ,x3, display, height, x, y, dt, fpsClock, FPS):
         world.Step(dt, 20, 20)
         world.ClearForces()
 
-        error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+        error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - world.domain_object.body.position[1])**2)
         print "Step %d/%d" %(step, len(x1))
         print "Error: ", error
 
         font = pygame.font.SysFont('Arial', 25)
         display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
         display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
+
+        pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
+        pygame.draw.circle(display, (0, 255, 0), (world.arm.end_effector_position()[0], height-world.arm.end_effector_position()[1]), 10)
 
         pygame.display.flip()
 

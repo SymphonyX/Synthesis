@@ -25,8 +25,8 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2 + 120, (height / 4)*3 - 350)
-dmp_dt = 0.002
+origin = (width / 2+150, (height / 4)*3 - 400)
+dmp_dt = 0.2
 fpsClock = None
 
 best_error = float("inf")
@@ -37,7 +37,7 @@ target_y = 0.0
 
 
 
-def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
+def normalize_dmp_pos(xpos, xmin=0, xmax=800):
 
     xpos_clean = []
     for xi in xpos:
@@ -46,7 +46,7 @@ def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
         elif xi < xmin:
             xpos_clean.append(xmin)
         else:
-            xpos_clean.append(xi[0])
+            xpos_clean.append(int(xi[0]))
     return xpos_clean
 
 def error_func(x):
@@ -54,36 +54,54 @@ def error_func(x):
     world = ResetWorld(origin, width, height, target_x, target_y)
     step = 0
 
-    dmp1 = DMP(basis, K, D, world.arm.joint1.angle, x[0])
-    dmp2 = DMP(basis, K, D, world.arm.joint2.angle, x[1])
-    dmp3 = DMP(basis, K, D, world.arm.joint3.angle, x[2])
+    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
+    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
+
 
     all_pos  = list()
-    count = 3
     for i in range(basis):
-        dmp1.weights[i] = x[count]
-        dmp2.weights[i] = x[count+basis]
-        dmp3.weights[i] = x[count+(2*basis)]
-        count += 1
+        dmp1reach.weights[i] = x[i]
+        dmp2reach.weights[i] = x[basis+i]
 
-    xpos, xdot, xddot, times = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
-    xpos_clean = normalize_dmp_pos(xpos)
-    all_pos.append( xpos_clean )
+    xpos1, xdot1, xddot1, times = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
+    l1,l2 = [], []
+    xpos1 = normalize_dmp_pos(xpos1)
+    for i in range(len(xpos1)):
+        l1.append( xpos1[i] )
+    all_pos.append(l1)
+    all_pos[0].append(dmp1reach.goal)
 
-    xpos, xdot, xddot, times = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
-    xpos_clean = normalize_dmp_pos(xpos)
-    all_pos.append( xpos_clean )
+    xpos2, xdot2, xddot2, times = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
+    xpos2 = normalize_dmp_pos(xpos2)
+    for i in range(len(xpos2)):
+        l2.append( xpos2[i] )
+    all_pos.append(l2)
+    all_pos[1].append(dmp2reach.goal)
 
-    xpos, xdot, xddot, times = dmp3.run_dmp(tau, dmp_dt, dmp3.start, dmp3.goal)
-    xpos_clean = normalize_dmp_pos(xpos, 0, math.pi)
-    all_pos.append( xpos_clean )
+    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
+    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
 
+    for i in range(basis):
+        dmp1push.weights[i] = x[(2*basis)+i]
+        dmp2push.weights[i] = x[(3*basis)+i]
+
+
+    xpos1, xdot1, xddot1, times = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
+    xpos1 = normalize_dmp_pos(xpos1)
+    for i in range(len(xpos1)):
+        all_pos[0].append( xpos1[i] )
+    all_pos[0].append(dmp1push.goal)
+
+    xpos2, xdot2, xddot2, times = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
+    xpos2 = normalize_dmp_pos(xpos2)
+    for i in range(len(xpos2)):
+        all_pos[1].append( xpos2[i] )
+    all_pos[1].append(dmp2push.goal)
 
     sum_distances = 0
-    for i in range(len(all_pos[0])-1):
-        sum_distances += math.fabs(all_pos[0][i+1] - all_pos[0][i])
-        sum_distances += math.fabs(all_pos[1][i+1] - all_pos[1][i])
-        sum_distances += math.fabs(all_pos[2][i+1] - all_pos[2][i])
+    # for i in range(len(all_pos[0])-1):
+    #     sum_distances += math.fabs(all_pos[0][i+1] - all_pos[0][i])
+    #     sum_distances += math.fabs(all_pos[1][i+1] - all_pos[1][i])
 
     thetas_reached = True
     tool_distance = 0.0
@@ -92,28 +110,39 @@ def error_func(x):
     total_error = 0.0
     total_steps = 0
     pd_step = 0
-    goal_reach_step = 0
-    while step < len(all_pos[0]) or thetas_reached == False:
+    while step < len(all_pos[0])-1 or thetas_reached == False:
         penalty = 0
-        prev_pos = world.domain_object.body.position.copy()
+
+        prev_pos = world.arm.end_effector_position()
+
         if thetas_reached == True:
-            SetJointsIteration(all_pos[0][step], all_pos[1][step], all_pos[2][step], world)
+            theta1, theta2, theta3 = world.arm.inverse_kinematics_ccd(all_pos[0][step], all_pos[1][step])
+            SetJointsIteration(theta1, theta2, theta3, world)
             step += 1
+            #print "Step %d/%d" %(step, len(all_pos[0]))
             thetas_reached = False
             contact = 0
             pd_step = 0
         else:
             thetas_reached = MoveJointsIteration(world.arm.joint1, world.arm.joint2, world.arm.joint3)
-            if pd_step == 1:
-                thetas_reached = True
-                pd_step = 0
-            tool_distance += math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
+
+            # if pd_step == 1:
+            #     thetas_reached = True
+            #     pd_step = 0
+            new_tool_distance = math.sqrt( (world.domain_object.body.position[0] - world.arm.tool.body2.position[0])**2 \
                                  + (world.domain_object.body.position[1] - world.arm.tool.body2.position[1])**2 ) #TODO this is only checking against the center
+            tool_distance += new_tool_distance
+
+        new_pos = world.arm.end_effector_position()
+        sum_distances += math.sqrt( (prev_pos[0] - new_pos[0])**2 + (prev_pos[1] - new_pos[1])**2 )
 
         pd_step += 1
         world.Step(dt, 20, 20)
         world.ClearForces()
-        traveled_distance += math.sqrt( (prev_pos[0] - world.domain_object.body.position[0])**2 + (prev_pos[1] - world.domain_object.body.position[1])**2)
+        if pd_step == 1000:
+            print "Escaping..."
+            penalty = 10000000
+            break
 
         object_contact = False
         for edge in world.domain_object.body.contacts:
@@ -126,31 +155,18 @@ def error_func(x):
             world.domain_object.body.angularVelocity = 0.0
             world.domain_object.body.linearVelocity = b2Vec2(0,0)
 
-        if UndesiredContact(world):
-            contact += 1
-            penalty += 1000
-            if contact == 1000:
-                penalty = 100000
-                break
 
-        if total_steps > 50000:
-            total_steps = 1 #make error large so we don't pick it
-            print "Escape..."
-            break
-
-
-        current_error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+        current_error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - world.domain_object.body.position[1])**2)
         total_error += current_error
         total_steps += 1
 
-        if current_error < 20.0 and goal_reach_step == 0:
-            goal_reach_step = total_steps
-
 
     #cost = (1000 * (total_error/total_steps)) + ( 100.0 * np.linalg.norm(x)) + (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
-    cost = (1000 * total_error) + (100 * sum_distances) + (100 * (total_steps - goal_reach_step))#		
+    # cost = (100 * total_error) + sum_distances + penalty
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] - (height - world.domain_object.body.position[1]))**2)
+    cost = (1000 * error) + (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+
     global best_error
     global best_params
     global best_distance
@@ -160,8 +176,8 @@ def error_func(x):
         best_params = x
         best_distance = error
 
-    print "\nAvg Error: ", (total_error/total_steps)
-    print "Error: ", error
+    #print "\nAvg Error: ", (total_error/total_steps)
+    print "\nError: ", error
     print "Trajectory length: ", sum_distances
     print "Cost: ", cost
 
@@ -220,29 +236,25 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 5
+        outer_iter = 1 if options.params is not None else 10
         for j in range(outer_iter):
             iterations = 5
             if options.params is not None:
                 if params is None:
                     params_file = open(options.params, "r")
                     params = pickle.load(params_file)
-                epsilons = np.zeros( (basis*3+3) )
-                epsilons[:3] = 0.5
-                epsilons[3:] = 0.5
-                iterations = 10
+                epsilons = np.zeros( (basis*4) )
+                epsilons[:] = 10.5
+                iterations = 5
             elif options.params is None:
-                params = np.random.uniform( -10, 10, (basis*3+3, 1) )
-                params[:3] = np.random.uniform(-2*math.pi, 2*math.pi)
-                epsilons = np.zeros( (basis*3+3) )
-                epsilons[:3] = 0.05
-                epsilons[3:] = 0.5
+                params = np.random.uniform( -40, 40, (basis*4, 1) )
+                epsilons = np.zeros( (basis*4) )
+                epsilons[:] = 10.0
 
             for i in range(iterations):
 
                 result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
-                epsilons[:3] = epsilons[:3] / 10.0
-                epsilons[3:] = epsilons[3:] / 10.0
+                epsilons[:] = epsilons[:] / 10.0
 
                 params = best_params
 
@@ -268,35 +280,54 @@ if __name__ == '__main__':
     world = ResetWorld(origin, width, height, target_x, target_y)
 
 
-    dmp1 = DMP(basis, K, D, world.arm.joint1.angle, result[0])
-    dmp2 = DMP(basis, K, D, world.arm.joint2.angle, result[1])
-    dmp3 = DMP(basis, K, D, world.arm.joint3.angle, result[2])
-
+    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
+    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
 
     all_pos  = list()
-    count = 3
     for i in range(basis):
-        dmp1.weights[i] = result[count]
-        dmp2.weights[i] = result[count+basis]
-        dmp3.weights[i] = result[count+(2*basis)]
-        count += 1
+        dmp1reach.weights[i] = result[i]
+        dmp2reach.weights[i] = result[i+basis]
+
+    x1, x1dot, x1ddot, t1 = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
+    x2, x2dot, x2ddot, t2 = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
+    l1, l2 = [], []
+    x1 = normalize_dmp_pos(x1)
+    for i in range(len(x1)):
+        l1.append( x1[i] )
+    all_pos.append( l1 )
+    all_pos[0].append(dmp1reach.goal)
+
+    x2 = normalize_dmp_pos(x2)
+    for i in range(len(x2)):
+        l2.append( x2[i] )
+    all_pos.append( l2 )
+    all_pos[1].append(dmp2reach.goal)
+
+    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
+    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
+    for i in range(basis):
+        dmp1push.weights[i] = result[i+(2*basis)]
+        dmp2push.weights[i] = result[i+(3*basis)]
 
 
-    x1, x1dot, x1ddot, t1 = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
-    x2, x2dot, x2ddot, t2 = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
-    x3, x3dot, x3ddot, t3 = dmp3.run_dmp(tau, dmp_dt, dmp3.start, dmp3.goal)
+    x1, x1dot, x1ddot, t1 = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
+    x2, x2dot, x2ddot, t2 = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
 
     x1 = normalize_dmp_pos(x1)
+    for i in range(len(x1)):
+        all_pos[0].append( x1[i] )
+    all_pos[0].append(dmp1push.goal)
+
     x2 = normalize_dmp_pos(x2)
-    x3 = normalize_dmp_pos(x3, 0, math.pi)
+    for i in range(len(x2)):
+        all_pos[1].append( x2[i] )
+    all_pos[1].append(dmp2push.goal)
 
-    plt.plot(t1, x1, "b")
+    steps = np.linspace(0, len(all_pos[0]), num=len(all_pos[0]))
+    plt.plot(steps, all_pos[0], label="x-position")
+    plt.plot(steps, all_pos[1], label="y-position")
+    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
     plt.show()
 
-    plt.plot(t2, x2, "r")
-    plt.show()
-
-    plt.plot(t3, x3, "g")
-    plt.show()
-
-    RunSimulation(world, x1, x2, x3, display, height, target_x, target_y, dt, fpsClock, FPS)
+    RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)

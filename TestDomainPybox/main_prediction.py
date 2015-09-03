@@ -21,8 +21,8 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2 + 120, (height / 4)*3 - 350)
-dmp_dt = 0.002
+origin = (width / 2, (height / 4)*3 - 450)
+dmp_dt = 0.004
 fpsClock = None
 
 
@@ -187,7 +187,6 @@ if __name__ == "__main__":
     feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
     feat[0,2] = target_theta
 
-    all_params=[]
     for i, network in enumerate(networks):
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)

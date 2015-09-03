@@ -1,4 +1,3 @@
-
 import math
 import pygame
 import pygame.locals
@@ -23,25 +22,13 @@ class Arm:
         self.basex = basex
         self.basey = basey
 
-        self.l2_angle = 2.5
-
     def createBodies(self, world):
         self.link1.pos = [ (self.basex, self.basey) ]
-        self.link2.pos = [ (self.basex+self.link1.length-20, self.basey-10) ]
-
-        vertices1 = [(-self.link1.length/2.0, -self.link1.line_width/2.0), (self.link1.length/2.0, -self.link1.line_width/2.0), (self.link1.length/2.0, self.link1.line_width/2.0), (-self.link1.length/2.0, self.link1.line_width/2.0)]
-        vertices2 = [(-self.link2.length/2.0, -self.link2.line_width/2.0), (self.link2.length/2.0, -self.link2.line_width/2.0), (self.link2.length/2.0, self.link2.line_width/2.0), (-self.link2.length/2.0, self.link2.line_width/2.0)]
+        self.link2.pos = [ (self.basex+self.link1.length-20, self.basey) ]
 
 
-        rotated_vertices2 = []
-        for vertex in vertices2:
-            new_vertex = (((vertex[0] - (vertices2[0][0])) * math.cos(self.l2_angle)) - ((vertex[1] - ((vertices2[3][1]-vertices2[0][1])/2)) * math.sin(self.l2_angle)) + (vertices2[0][0]), \
-                          ((vertex[0] - (vertices2[0][0])) * math.sin(self.l2_angle)) + ((vertex[1] - ((vertices2[3][1]-vertices2[0][1])/2)) * math.cos(self.l2_angle)) + ((vertices2[3][1]-vertices2[0][1])/2) )
-
-            rotated_vertices2.append( new_vertex )
-
-        self.link1.createBody(world, vertices1, "link1", density=1.5)
-        self.link2.createBody(world, rotated_vertices2, "link2", density=1.0)
+        self.link1.createBody(world, "link1", density=1.5)
+        self.link2.createBody(world, "link2", density=1.0)
 
 
         self.set_pivot_positions()
@@ -52,21 +39,20 @@ class Arm:
         self.pivot1.userData = "pivot1"
 
         self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-5.5, upperAngle=0.2)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
 
         self.tool = Tool(self.pivot_position3[0], self.pivot_position3[1], world, 100.0)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/4.0, upperAngle=(3.0/4.0)*math.pi)
-
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/2.0, upperAngle=math.pi/2.0)
 
 
     def set_pivot_positions(self):
-        self.pivot_position1 = (self.basex-self.link1.length/2.0, self.basey)
+        self.pivot_position1 = (self.basex-self.link1.length/2.0, self.basey-self.link1.line_width/4.0)
 
         self.pivot_position2 = (self.pivot_position1[0]+(self.link1.length * math.cos(self.link1.body.angle)), \
                                                          self.pivot_position1[1]+(self.link1.length * math.sin(self.link1.body.angle)))
 
-        self.pivot_position3 = (self.pivot_position2[0]+((self.link2.length-2) * math.cos(self.l2_angle))+15, \
-                                                         self.pivot_position2[1]+((self.link2.length-2) * math.sin(self.l2_angle)))
+        self.pivot_position3 = (self.pivot_position2[0]+((self.link2.length-2) * math.cos(self.link2.body.angle)), \
+                                                         self.pivot_position2[1]+((self.link2.length-2) * math.sin(self.link2.body.angle))+5)
 
 
     def move_arm_absolute(self, theta1, theta2):
@@ -80,18 +66,87 @@ class Arm:
                         (self.link1.pos[1][0] + self.link1.length * math.cos(self.link1.rotation) + self.link2.length * math.cos(self.link1.rotation + self.link2.rotation), self.link1.pos[1][1] + self.link1.length * math.sin(self.link1.rotation) + self.link2.length * math.sin(self.link1.rotation + self.link2.rotation)) \
                         ]
 
-    def inverse_kinematics(self, desired_x, desired_y):
-        #c2 needs to be in [-1,1], otherwise point is outside reachable workspace
-        c2 = (desired_x**2 + desired_y**2 - self.link1.length**2 - self.link2.length**2) / (2*self.link1.length * self.link2.length)
-        if c2 < -1 or c2 > 1:
-            return None, None
+    def _compute_position(self, basept, length, angle):
+        p = np.empty( (2, 1) )
+        p[0] = basept[0] + length * math.cos(angle)
+        p[1] = basept[1] + length * math.sin(angle)
 
-        s2 = -math.sqrt(1 - c2**2)
+        return p
 
-
-        theta2 = math.atan2(s2, c2)
-        theta1 = math.atan2(desired_y, desired_x) - math.atan2(self.link2.length * s2, self.link1.length + self.link2.length * c2)
-
-        return theta1, theta2
+    def end_effector_position(self):
+        return self._compute_position(self.pivot_position3, self.tool.length, self.joint1.angle+self.joint2.angle+self.joint3.angle)
 
 
+    def inverse_kinematics_ccd(self, desired_x, desired_y):
+
+        target = np.empty( (2, 1) )
+        target[0] = desired_x
+        target[1] = desired_y
+
+        basept = np.empty( (2, 1))
+        basept[0] = self.joint1.anchorA[0]
+        basept[1] = self.joint1.anchorA[1]
+
+        p1 = self._compute_position(self.joint1.anchorA, self.link1.length, self.joint1.angle)
+        p2 = self._compute_position(self.joint2.anchorA, self.link2.length, self.joint1.angle+self.joint2.angle)
+        p3 = self._compute_position(self.joint3.anchorA, self.tool.length, self.joint1.angle+self.joint2.angle+self.joint3.angle)
+
+        theta1, theta2, theta3 = self.joint1.angle, self.joint2.angle, self.joint3.angle
+
+        arm_length = self.link1.length + self.link2.length + self.tool.length
+        target_pivot_distance = math.sqrt( (desired_x - self.joint1.anchorA[0])**2 + (desired_y - self.joint1.anchorA[1])**2 )
+        if target_pivot_distance > arm_length - 10:
+            target[0] -= target_pivot_distance
+            target[1] -= target_pivot_distance
+
+        iteration = 0
+        pi2 = math.pi * 2
+        while np.linalg.norm(target - p3) > 0.02 and iteration < 20:
+            dotprod = np.dot( np.transpose((p3 - p2) / np.linalg.norm(p3 - p2)), (target - p2) / np.linalg.norm(target - p2))
+
+            delta3 = np.arccos( round(dotprod, 4) )
+            delta3_direction = ((p3[0] - p2[0])*(target[1] - p2[1]) - (p3[1] - p2[1]) * (target[0] - p2[0])) \
+                                / (np.linalg.norm(p3 - p2) * np.linalg.norm(target - p2))
+            delta3 = delta3
+            if delta3_direction < 0:
+                delta3 = -delta3
+            theta3 += delta3
+            if theta3 > math.pi / 2.0:
+                theta3 = math.pi / 2.0
+            elif theta3 < -math.pi / 2.0:
+                theta3 = -math.pi / 2.0
+            p3 = self._compute_position(p2, self.tool.length, theta1+theta2+theta3)
+
+
+            dotprod = np.dot( np.transpose((p3 - p1) / np.linalg.norm(p3 - p1)), (target - p1) / np.linalg.norm(target - p1))
+            delta2 = np.arccos( round(dotprod, 4) )
+            delta2_direction = ((p3[0] - p1[0])*(target[1] - p1[1]) - (p3[1] - p1[1]) * (target[0] - p1[0])) \
+                                / (np.linalg.norm(p3 - p1) * np.linalg.norm(target - p1))
+            delta2 = delta2
+            if delta2_direction < 0:
+                delta2 = -delta2
+            theta2 += delta2
+            if theta2 > math.pi/2.0:
+                theta2 = math.pi/2.0
+            elif theta2 < -math.pi/2.0:
+                theta2 = -math.pi/2.0
+
+            p2 = self._compute_position(p1, self.link2.length, theta1+theta2)
+            p3 = self._compute_position(p2, self.tool.length, theta1+theta2+theta3)
+
+            dotprod = np.dot( np.transpose((p3 - basept) / np.linalg.norm(p3 - basept)), (target - basept) / np.linalg.norm(target - basept))
+            delta1 = np.arccos( round(dotprod, 4) )
+            delta1_direction = ((p3[0] - basept[0])*(target[1] - basept[1]) - (p3[1] - basept[1]) * (target[0] - basept[0])) \
+                                / (np.linalg.norm(p3 - basept) * np.linalg.norm(target - basept))
+            delta1 = delta1
+            if delta1_direction < 0:
+                delta1 = -delta1
+            theta1 += delta1
+            theta1 = theta1 % pi2
+            p1 = self._compute_position(basept, self.link1.length, theta1)
+            p2 = self._compute_position(p1, self.link2.length, theta1+theta2)
+            p3 = self._compute_position(p2, self.tool.length, theta1+theta2+theta3)
+
+            iteration += 1
+
+        return theta1, theta2, theta3

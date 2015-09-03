@@ -53,8 +53,9 @@ if __name__ == "__main__":
         for i, network in enumerate(networks):
             new_feat = network.transform_features(feat)
             prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
-            prediction = (prediction * (ymax - ymin)) + ymin
-            all_params = prediction
+            prediction = (prediction * (ymax[i] - ymin[i])) + ymin[i]
+            all_params.append(prediction)
+            # all_params = prediction
 
         parameters.append(all_params)
 
