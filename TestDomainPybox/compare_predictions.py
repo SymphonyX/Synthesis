@@ -44,10 +44,9 @@ if __name__ == "__main__":
     for theta in thetas:
         y = 200 * math.sin(theta)
         x = 200 * math.cos(theta)
-        feat = np.zeros( (1, 3) )
+        feat = np.zeros( (1, 2) )
         feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
         feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
-        feat[0,2] = theta
 
         all_params=[]
         for i, network in enumerate(networks):
@@ -55,7 +54,6 @@ if __name__ == "__main__":
             prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
             prediction = (prediction * (ymax[i] - ymin[i])) + ymin[i]
             all_params.append(prediction)
-            # all_params = prediction
 
         parameters.append(all_params)
 

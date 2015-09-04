@@ -94,10 +94,10 @@ class Arm:
         theta1, theta2, theta3 = self.joint1.angle, self.joint2.angle, self.joint3.angle
 
         arm_length = self.link1.length + self.link2.length + self.tool.length
-        target_pivot_distance = math.sqrt( (desired_x - self.joint1.anchorA[0])**2 + (desired_y - self.joint1.anchorA[1])**2 )
-        if target_pivot_distance > arm_length - 10:
-            target[0] -= target_pivot_distance
-            target[1] -= target_pivot_distance
+        # target_pivot_distance = math.sqrt( (desired_x - self.joint1.anchorA[0])**2 + (desired_y - self.joint1.anchorA[1])**2 )
+        # if target_pivot_distance > arm_length - 10:
+        #     target[0] -= target_pivot_distance
+        #     target[1] -= target_pivot_distance
 
         iteration = 0
         pi2 = math.pi * 2

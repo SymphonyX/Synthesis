@@ -124,13 +124,13 @@ def SetJointsIteration(theta1, theta2, theta3, world):
 
 
 def MoveJointsIteration(joint1, joint2, joint3, printing=False):
-    speed1 = PD1.update(joint1.angle) * 1000
+    speed1 = PD1.update(joint1.angle) * 10
     joint1.motorSpeed = speed1
 
-    speed2 = PD2.update(joint2.angle) * 1000
+    speed2 = PD2.update(joint2.angle) * 10
     joint2.motorSpeed = speed2
 
-    speed3 = PD3.update(joint3.angle) * 1000
+    speed3 = PD3.update(joint3.angle) * 10
     joint3.motorSpeed = speed3
 
 

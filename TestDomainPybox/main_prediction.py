@@ -21,8 +21,8 @@ height = 1000
 
 FPS = 60
 dt = 1.0 / FPS
-origin = (width / 2, (height / 4)*3 - 450)
-dmp_dt = 0.004
+origin = (width / 2+150, (height / 4)*3 - 400)
+dmp_dt = 0.2
 fpsClock = None
 
 
@@ -99,19 +99,19 @@ def trainNetworks(options):
     for i in range(training_y.shape[1]):
         print "Network ", i
         indexes = np.random.permutation(training_x.shape[0])
-        training_x = training_x[indexes]
+        training_xi = training_x[indexes]
         training_yi = training_y[indexes]
 
         training_yi = training_yi[:,i]
         training_yi = training_yi.reshape( (training_yi.shape[0], 1) )
 
-        mixExperts = MixtureOfExperts(experts, "em", "coop", training_x, training_yi, poly_degree=1, feat_type="polynomial")
+        mixExperts = MixtureOfExperts(experts, "em", "coop", training_xi, training_yi, poly_degree=1, feat_type="polynomial")
         mixExperts.learningRate = learningRate
         mixExperts.decay = decay
 
 
-        test_x = training_x[:training_x.shape[0]/4]
-        train_x = training_x[training_x.shape[0]/4:]
+        test_x = training_xi[:training_xi.shape[0]/4]
+        train_x = training_xi[training_xi.shape[0]/4:]
         test_y = training_yi[:training_yi.shape[0]/4]
         train_y = training_yi[training_yi.shape[0]/4:]
 
@@ -122,19 +122,6 @@ def trainNetworks(options):
 
     return networks, xmin, xmax, ymin, ymax
 
-
-
-def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
-
-    xpos_clean = []
-    for xi in xpos:
-        if xi > xmax:
-            xpos_clean.append(xmax)
-        elif xi < xmin:
-            xpos_clean.append(xmin)
-        else:
-            xpos_clean.append(xi[0])
-    return xpos_clean
 
 
 if __name__ == "__main__":
@@ -182,50 +169,61 @@ if __name__ == "__main__":
 
 
     parameters = []
-    feat = np.zeros( (1, 3) )
+    feat = np.zeros( (1, 2) )
     feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
     feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
-    feat[0,2] = target_theta
 
     for i, network in enumerate(networks):
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
         prediction = (prediction * (ymax[i] - ymin[i])) + ymin[i]
         parameters.append(prediction)
-        # parameters = prediction
 
 
-    dmp1 = DMP(basis, K, D, world.arm.joint1.angle, parameters[0])
-    dmp2 = DMP(basis, K, D, world.arm.joint2.angle, parameters[1])
-    dmp3 = DMP(basis, K, D, world.arm.joint3.angle, parameters[2])
+    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
+    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
 
     all_pos  = list()
-    count = 3
     for i in range(basis):
-        dmp1.weights[i] = parameters[count]
-        dmp2.weights[i] = parameters[count+basis]
-        dmp3.weights[i] = parameters[count+(2*basis)]
-        count += 1
+        dmp1reach.weights[i] = parameters[i]
+        dmp2reach.weights[i] = parameters[i+basis]
+
+    x1, x1dot, x1ddot, t1 = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
+    x2, x2dot, x2ddot, t2 = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
+    l1, l2 = [], []
+    # x1 = normalize_dmp_pos(x1)
+    for i in range(len(x1)):
+        l1.append( x1[i] )
+    all_pos.append( l1 )
+    # all_pos[0].append(dmp1reach.goal)
+
+    # x2 = normalize_dmp_pos(x2)
+    for i in range(len(x2)):
+        l2.append( x2[i] )
+    all_pos.append( l2 )
+    # all_pos[1].append(dmp2reach.goal)
+
+    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
+    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
+    for i in range(basis):
+        dmp1push.weights[i] = parameters[i+(2*basis)]
+        dmp2push.weights[i] = parameters[i+(3*basis)]
 
 
-    x1, x1dot, x1ddot, t1 = dmp1.run_dmp(tau, dmp_dt, dmp1.start, dmp1.goal)
-    x2, x2dot, x2ddot, t2 = dmp2.run_dmp(tau, dmp_dt, dmp2.start, dmp2.goal)
-    x3, x3dot, x3ddot, t3 = dmp3.run_dmp(tau, dmp_dt, dmp3.start, dmp3.goal)
+    x1, x1dot, x1ddot, t1 = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
+    x2, x2dot, x2ddot, t2 = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
 
-    x1 = normalize_dmp_pos(x1)
-    x2 = normalize_dmp_pos(x2)
-    x3 = normalize_dmp_pos(x3, 0, math.pi)
+    # x1 = normalize_dmp_pos(x1)
+    for i in range(len(x1)):
+        all_pos[0].append( x1[i] )
+    all_pos[0].append(dmp1push.goal)
 
-    plt.plot(t1, x1, "b")
-    plt.show()
+    # x2 = normalize_dmp_pos(x2)
+    for i in range(len(x2)):
+        all_pos[1].append( x2[i] )
+    all_pos[1].append(dmp2push.goal)
 
-    plt.plot(t2, x2, "r")
-    plt.show()
-
-    plt.plot(t3, x3, "g")
-    plt.show()
-
-    RunSimulation(world, x1, x2, x3, display, height, x, y, dt, fpsClock, FPS)
+    RunSimulation(world, all_pos[0], all_pos[1], display, height, x, y, dt, fpsClock, FPS)
 
 
 
