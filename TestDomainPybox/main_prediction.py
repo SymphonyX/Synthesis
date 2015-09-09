@@ -22,7 +22,7 @@ height = 1000
 FPS = 60
 dt = 1.0 / FPS
 origin = (width / 2+150, (height / 4)*3 - 400)
-dmp_dt = 0.2
+dmp_dt = 0.1
 fpsClock = None
 
 

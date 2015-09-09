@@ -27,7 +27,7 @@ class Arm:
         self.link2.pos = [ (self.basex+self.link1.length-20, self.basey) ]
 
 
-        self.link1.createBody(world, "link1", density=1.5)
+        self.link1.createBody(world, "link1", density=5.0)
         self.link2.createBody(world, "link2", density=1.0)
 
 
