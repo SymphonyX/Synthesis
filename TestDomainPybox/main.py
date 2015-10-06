@@ -218,9 +218,9 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 5
+        outer_iter = 1 if options.params is not None else 1
         for j in range(outer_iter):
-            iterations = 3
+            iterations = 1
             if options.params is not None:
                 if params is None:
                     params_file = open(options.params, "r")
@@ -239,7 +239,7 @@ if __name__ == '__main__':
                 status_file.write("Outer: " + str(j) + " Inner: " + str(i))
                 status_file.close()
 
-                result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons, maxiter=10)
+                result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
                 epsilons[:] = epsilons[:] / 10.0
 
                 #params = best_params
@@ -259,6 +259,7 @@ if __name__ == '__main__':
         error_file.write("\nCost: " + str(best_error))
         error_file.close()
         param_file.close()
+
 
     pygame.init()
     display = pygame.display.set_mode((width, height))
@@ -287,6 +288,7 @@ if __name__ == '__main__':
         l2.append( xpos2[i] )
     all_pos.append(l2)
 
+
     dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
     dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
 
@@ -305,11 +307,4 @@ if __name__ == '__main__':
         all_pos[1].append( xpos2[i] )
     all_pos[1].append(dmp2push.goal)
 
-    # steps = np.linspace(0, len(all_pos[0]), num=len(all_pos[0]))
-    # plt.plot(steps, all_pos[0], label="x-position")
-    # plt.plot(steps, all_pos[1], label="y-position")
-    # plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-    #       ncol=2, mode="expand", borderaxespad=0.)
-    # plt.show()
-
-    RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)
+    # RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)

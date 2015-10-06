@@ -111,7 +111,7 @@ def trainNetworks(options):
     test_y = training_y[:training_y.shape[0]/4]
     train_y = training_y[training_y.shape[0]/4:]
 
-    mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 30)
+    mixExperts.trainNetwork(train_x, train_y, test_x, test_y, 50)
 
     mixExperts.setToBestParams()
     networks.append(mixExperts )
@@ -147,6 +147,7 @@ if __name__ == "__main__":
 
     parser.add_option("-r", "--rate", action="store", help="learning rate", type="float")
     parser.add_option("-d", "--decay", action="store", help="decay rate", type="float")
+    parser.add_option("-m", "--moe", action="store", help="moe file name", type="string")
 
 
     (options, args) = parser.parse_args()
@@ -173,7 +174,7 @@ if __name__ == "__main__":
 
     else:
         networks, xmin, xmax, ymin, ymax = trainNetworks(options)
-        f = open("network_parameters_mul.pkl", "w")
+        f = open(options.moe, "w")
         pickle.dump((networks, xmin, xmax, ymin, ymax), f)
 
 

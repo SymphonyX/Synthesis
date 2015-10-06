@@ -18,7 +18,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print "Arg2: dataset directory"
 
-    f = open("network_parameters_mul.pkl", "r")
+    f = open("testmul.pkl", "r")
     data = pickle.load(f)
     networks = data[0]
     xmin = data[1]

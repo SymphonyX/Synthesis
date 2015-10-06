@@ -93,19 +93,17 @@ class MixtureOfExperts:
                 minx = min(training_x[:,j])
                 step = (maxx - minx) / num_experts
                 location[j] = (minx + step/2) + step * i
+            # location = np.random.random( (dimension_in, 1) )
             self.experts.append( Expert(dimension_in, dimension_out, location, i) )
 
     def computeExpertsOutputs(self, x):
-        expertOutputs = list()
-        [expertOutputs.append( expert.computeExpertyhat(x) ) for expert in self.experts]
-        expertOutputs = np.asarray( expertOutputs ).reshape(expertOutputs[0].size, len(expertOutputs))
-
-        return expertOutputs
+        return np.array([e.computeExpertyhat(x) for e in self.experts]).T
+        
 
     def computeMixtureOutput(self, x):
         expertOutputs = self.computeExpertsOutputs(x)
         gateOutputs = self.gateNet.outputs(self.experts, x)
-        finalOutput = expertOutputs.dot( np.transpose(gateOutputs) )
+        finalOutput = expertOutputs.dot( gateOutputs )
 
         return finalOutput, expertOutputs
 
@@ -123,7 +121,7 @@ class MixtureOfExperts:
                 y = yset[i]
                 hs = self.gateNet._compute_hs(self.experts, x, y)
                 for j, expert in enumerate(self.experts):
-                    expert.addError( hs[j], np.linalg.norm(y - expPrediction[0][j])**2 )
+                    expert.addError( hs[j], sum((y - expPrediction[:,j])**2) / yset.shape[0] )
 
         error = 0
         for i in range(len(finalOutputs)):

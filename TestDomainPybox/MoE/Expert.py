@@ -20,6 +20,8 @@ class Expert:
         return np.transpose(self.location)
 
     def setMean(self, mean):
+        if len(mean.shape) == 1:
+            mean = mean.reshape( (1, mean.shape[0]))
         self.location = np.transpose(mean)
 
     def resetError(self):
@@ -38,7 +40,7 @@ class Expert:
         #     print "Expert sum_hs is 0. Cannot normalize error"
 
     def computeExpertyhat(self, x):
-        return self.weights.dot( np.transpose(x) )
+        return self.weights.dot( x.T )
 
     def saveBestWeights(self):
         self.best_weights = self.weights.copy()

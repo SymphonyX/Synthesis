@@ -39,10 +39,10 @@ class GaussianGate(Gate):
                 print "a"
             xm_diff = x - m_i
             mult = -0.5 * (xm_diff.dot(np.linalg.pinv(sigma_i)).dot(np.transpose(xm_diff)))
-            prod = math.pow((2*math.pi), -n/2) * math.pow(np.linalg.det(sigma_i), -1/2)
-            if mult < -100:
-                mult = -100
-            px_given_vj = prod * math.exp(mult)
+            prod = math.pow((2*math.pi), -n/2.0) * np.power(np.linalg.det(sigma_i), -1.0/2.0)
+            if mult < -200.0:
+                mult = -200.0
+            px_given_vj = prod * np.exp(mult)
             px_times_alpha.append( (px_given_vj * self.alphas[expert.index]) )
 
 
@@ -52,7 +52,6 @@ class GaussianGate(Gate):
             params[i] = px_times_alpha[i] / sum_px
             if math.isnan(params[i]):
                 print "A"
-
 
         return np.transpose(params)[0]
 
@@ -65,14 +64,14 @@ class GaussianGate(Gate):
         for i, expert in enumerate(experts):
             expertOutput = expert.computeExpertyhat(x)
             if expertOutput.shape != y.shape:
-                raise Exception("Output shape does not align")
+                raise Exception("Output shape does not align. Output shape: ", expertOutput.shape, " Y: ", y.shape)
 
             exponent = -0.5 * np.transpose((y - expertOutput)).dot((y - expertOutput))
-            if exponent < -100:
-                exponent = -100
+            if exponent < -200.0:
+                exponent = -200.0
             g_xv = self.outputs(experts, x)
-            temp_hs[i] = g_xv[i] * math.exp( exponent )
 
+            temp_hs[i] = g_xv[i] * math.exp( exponent )
 
         for i in range(temp_hs.shape[0]):
             sum_temp_hs = np.sum(temp_hs, axis=0)
@@ -84,9 +83,9 @@ class GaussianGate(Gate):
 
     #M-step
     def _update_alphas(self, experts, xs, ys):
-        n = xs.shape[0]
+        n = xs.shape[0] 
         sum_hs = np.zeros( (len(experts), 1) )
-        for i in range(ys.shape[0]):
+        for i in xrange(ys.shape[0]):
             sum_hs += self._compute_hs(experts, xs[i], ys[i])
 
         return sum_hs / n
@@ -94,16 +93,14 @@ class GaussianGate(Gate):
     def _update_ms(self, experts, xs, ys):
         sum_hs = np.zeros( (len(experts), 1) )
         sum_hs_x = np.zeros( (len(experts), xs[0].shape[0]) )
-        for i in range(ys.shape[0]):
+        for i in xrange(ys.shape[0]):
             hs = self._compute_hs(experts, xs[i], ys[i])
             sum_hs += hs
-            for j in range(hs.shape[0]):
-                h = hs[j]
-                sum_hs_x[j] += h * xs[i]
+            sum_hs_x += hs * xs[i]
 
         ms = list()
-        for i in range(len(experts)):
-            ms.append( (1 / sum_hs[i]) * sum_hs_x[i] )
+        for i in xrange(len(experts)):
+            ms.append( sum_hs_x[i] / sum_hs[i] )
 
         return ms
 
@@ -127,7 +124,7 @@ class GaussianGate(Gate):
 
         sigmas = list()
         for i in range(self.sigma.shape[0]):
-            sigmas.append( (1 / sum_hs[i]) * sum_hs_xm[i] )
+            sigmas.append( sum_hs_xm[i] / sum_hs[i]  )
 
         return sigmas
 
@@ -153,8 +150,6 @@ class GaussianGate(Gate):
             y = training_y[i]
 
             hs = self._compute_hs( [ newExpert, oldExpert ], x, y)
-            if math.isnan(hs[0]) or math.isnan(hs[1]):
-                continue
 
             if hs[0] > hs[1]:
                 htsum[0] += hs[0]
@@ -182,6 +177,8 @@ class GaussianGate(Gate):
                 yvec[i] = y[k]
                 for j in range(len(experts)):
                     Cmat[j][i][i] = hs[j]
+                    # if hs[j] == 0:
+                    #     print "Weights cannot be 0!!!!"
 
             return_weights = []
             for i, expert in enumerate(experts):
@@ -196,58 +193,22 @@ class GaussianGate(Gate):
         return all_weights
 
 
-
-    def error_func(self, weights, training_x, training_y, experts, expert_index):
-
-        experts[expert_index].weights = weights.reshape(experts[expert_index].weights.shape)
-
-        total_error = 0.0
-        for i in range(training_x.shape[0]):
-            x = training_x[i]
-            y = training_y[i]
-            hs = self._compute_hs(experts, x, y)
-
-            yhat = experts[expert_index].computeExpertyhat(x)
-            total_error += hs[expert_index] * np.linalg.norm(y - yhat)**2
-
-        # print "BFGS Total Error: ", total_error, " Expert ", expert_index+1, "/", len(experts)
-
-        return total_error
-
-
     def train(self, training_x, training_y, experts, learningRate):
 
         new_alphas = self._update_alphas(experts, training_x, training_y)
         new_ms = self._update_ms(experts, training_x, training_y)
         new_sigmas = self._update_sigma(experts, training_x, training_y)
 
-        # new_weights = []
-        # for index, expert in enumerate(experts):
-        #     print "Expert %d/%d" %(index+1, len(experts))
-        #     original_weights = expert.weights.copy()
-        #     weights = original_weights.copy()
-        #
-        #     result = optimize.fmin_bfgs(f=self.error_func, x0=weights, epsilon=0.1, args=(training_x, training_y, experts, index))
-        #
-        #     expert.weights = original_weights
-        #     new_weights.append( result.reshape(expert.weights.shape) )
-        #
-        # for i, expert in enumerate( experts ):
-        #     expert.weights = new_weights[i]
-
-
         new_weights = self.update_weights_wls(experts, training_x, training_y)
+
         for j in range(training_y.shape[1]):
             for i, expert in enumerate(experts):
                 expert.weights[j] = new_weights[j][i]
 
         self.alphas = new_alphas
-        for i, s in enumerate(new_sigmas):
-            self.sigma[i] = s
-            for j in range(self.sigma[i].shape[0]):
-                for k in range(self.sigma[i].shape[0]):
-                    if j != k: self.sigma[i][j][k] = 0
-                    elif j == k and self.sigma[i][j][k] < 0.000001: self.sigma[i][j][k] = 0.000001
+
+        new_sigmas = np.array(new_sigmas) * np.eye( new_sigmas[0].shape[0] )
+        new_sigmas[ new_sigmas < 0.00001 ] = 0.00001
 
         for i, m in enumerate(new_ms):
             experts[i].setMean(m)

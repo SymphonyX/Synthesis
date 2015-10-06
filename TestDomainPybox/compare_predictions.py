@@ -18,7 +18,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print "Arg2: dataset directory"
 
-    f = open("network_parameters.pkl", "r")
+    f = open("moe_network_15.pkl", "r")
     data = pickle.load(f)
     networks = data[0]
     xmin = data[1]
@@ -77,8 +77,10 @@ if __name__ == "__main__":
         for p in parameters:
             params.append(p[i])
 
-        plt.plot(thetas, params, label="prediction")
+        plt.plot(thetas, params, "--", label="prediction")
         plt.legend(bbox_to_anchor=(0.8, 1), loc=2, borderaxespad=0.)
+        plt.ylabel("weights")
+        plt.xlabel("degrees in radians")
         plt._show()
 
 
