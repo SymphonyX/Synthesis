@@ -57,21 +57,18 @@ class GaussianGate(Gate):
 
     #E-step
     def _compute_hs(self, experts, x, y):
-        temp_hs = np.zeros( (len(experts), 1) )
-        hs = np.zeros( (len(experts), 1) )
+        if len(x.shape) > 1:
+            x = x[0]
+            y = y[0]
 
+        expertOutput = np.array([e.computeExpertyhat(x) for e in experts])
+        g_xv = self.outputs(experts, x)
         y = np.transpose(y)
-        for i, expert in enumerate(experts):
-            expertOutput = expert.computeExpertyhat(x)
-            if expertOutput.shape != y.shape:
-                raise Exception("Output shape does not align. Output shape: ", expertOutput.shape, " Y: ", y.shape)
+        if expertOutput[0].shape != y.shape:
+            raise Exception("Output shape does not align. Output shape: ", expertOutput.shape, " Y: ", y.shape)
 
-            exponent = -0.5 * np.transpose((y - expertOutput)).dot((y - expertOutput))
-            if exponent < -200.0:
-                exponent = -200.0
-            g_xv = self.outputs(experts, x)
-
-            temp_hs[i] = g_xv[i] * math.exp( exponent )
+        exponents = np.array([-0.5 * np.transpose((y - expertOutput[i])).dot((y - expertOutput[i])) for i in xrange(len(experts))])
+        temp_hs = (g_xv * np.exp( exponents )).reshape( (len(experts), 1) )
 
         return temp_hs / np.sum(temp_hs, axis=0)
 
