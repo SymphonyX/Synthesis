@@ -194,8 +194,8 @@ if __name__ == "__main__":
 
     all_pos  = list()
     for i in range(basis):
-        dmp1reach.weights[i] = parameters[i]
-        dmp2reach.weights[i] = parameters[i+basis]
+        dmp1reach.weights[i] = parameters[0,i]
+        dmp2reach.weights[i] = parameters[0,i+basis]
 
     x1, x1dot, x1ddot, t1 = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
     x2, x2dot, x2ddot, t2 = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
@@ -215,8 +215,8 @@ if __name__ == "__main__":
     dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
     dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
     for i in range(basis):
-        dmp1push.weights[i] = parameters[i+(2*basis)]
-        dmp2push.weights[i] = parameters[i+(3*basis)]
+        dmp1push.weights[i] = parameters[0,i+(2*basis)]
+        dmp2push.weights[i] = parameters[0,i+(3*basis)]
 
 
     x1, x1dot, x1ddot, t1 = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)

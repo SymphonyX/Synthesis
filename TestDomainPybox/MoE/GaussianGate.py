@@ -73,13 +73,7 @@ class GaussianGate(Gate):
 
             temp_hs[i] = g_xv[i] * math.exp( exponent )
 
-        for i in range(temp_hs.shape[0]):
-            sum_temp_hs = np.sum(temp_hs, axis=0)
-            hs[i] = temp_hs[i] / sum_temp_hs
-            if sum_temp_hs == 0:
-                print "b"
-
-        return hs
+        return temp_hs / np.sum(temp_hs, axis=0)
 
     #M-step
     def _update_alphas(self, experts, xs, ys):
