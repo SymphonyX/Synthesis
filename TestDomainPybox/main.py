@@ -35,62 +35,37 @@ target_x = 0.0
 target_y = 0.0
 
 
+def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 
-def normalize_dmp_pos(xpos, xmin=0, xmax=800):
+    dmps_list = []
+    for i in range(len(starts)):
+        dmp = DMP(num_basis, K, D, starts[i], goals[i])
+        for j in range(num_basis):
+            dmp.weights[j] = params[j+(num_basis*i)]
+        dmps_list.append(dmp)
+    return dmps_list
 
-    xpos_clean = []
-    for xi in xpos:
-        if xi > xmax:
-            xpos_clean.append(xmax)
-        elif xi < xmin:
-            xpos_clean.append(xmin)
-        else:
-            xpos_clean.append(int(xi[0]))
-    return xpos_clean
 
 def error_func(x):
 
     world = ResetWorld(origin, width, height, target_x, target_y)
     step = 0
 
-    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
-    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
+    starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
+                world.domain_object.body.position[0], world.domain_object.body.position[1]]
+    goals = [world.domain_object.body.position[0], world.domain_object.body.position[1], 
+                world.domain_object.target_position[0], world.domain_object.target_position[1]]
 
+    dmps_list = generate_dmps_from_parameters(x, basis, starts, goals, K, D)
 
-    all_pos  = list()
-    for i in range(basis):
-        dmp1reach.weights[i] = x[i]
-        dmp2reach.weights[i] = x[basis+i]
+    all_pos = [ [], [] ]
+    for i, dmp in enumerate(dmps_list):
+        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
+        for j in range( len(xpos) ):
+            all_pos[ (i % 2) ].append( xpos[j] )
 
-    xpos1, xdot1, xddot1, times = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
-    l1,l2 = [], []
-
-    for i in range(len(xpos1)):
-        l1.append( xpos1[i] )
-    all_pos.append(l1)
-
-    xpos2, xdot2, xddot2, times = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
-    for i in range(len(xpos2)):
-        l2.append( xpos2[i] )
-    all_pos.append(l2)
-
-    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
-    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
-
-    for i in range(basis):
-        dmp1push.weights[i] = x[(2*basis)+i]
-        dmp2push.weights[i] = x[(3*basis)+i]
-
-
-    xpos1, xdot1, xddot1, times = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
-    for i in range(len(xpos1)):
-        all_pos[0].append( xpos1[i] )
-    all_pos[0].append(dmp1push.goal)
-
-    xpos2, xdot2, xddot2, times = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
-    for i in range(len(xpos2)):
-        all_pos[1].append( xpos2[i] )
-    all_pos[1].append(dmp2push.goal)
+    all_pos[0].append( dmps_list[2].goal ) #Append x target position
+    all_pos[1].append( dmps_list[3].goal ) #Append y target position
 
     sum_distances = 0
 
@@ -266,45 +241,20 @@ if __name__ == '__main__':
     fpsClock = pygame.time.Clock()
     world = ResetWorld(origin, width, height, target_x, target_y)
 
+    starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
+                world.domain_object.body.position[0], world.domain_object.body.position[1]]
+    goals = [world.domain_object.body.position[0], world.domain_object.body.position[1], 
+                world.domain_object.target_position[0], world.domain_object.target_position[1]]
 
-    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
-    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
+    dmps_list = generate_dmps_from_parameters(result, basis, starts, goals, K, D)
 
+    all_pos = [ [], [] ]
+    for i, dmp in enumerate(dmps_list):
+        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
+        for j in range( len(xpos) ):
+            all_pos[ (i % 2) ].append( xpos[j] )
 
-    all_pos  = list()
-    for i in range(basis):
-        dmp1reach.weights[i] = result[i]
-        dmp2reach.weights[i] = result[basis+i]
+    all_pos[0].append( dmps_list[2].goal ) #Append x target position
+    all_pos[1].append( dmps_list[3].goal ) #Append y target position
 
-    xpos1, xdot1, xddot1, times = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
-    l1,l2 = [], []
-
-    for i in range(len(xpos1)):
-        l1.append( xpos1[i] )
-    all_pos.append(l1)
-
-    xpos2, xdot2, xddot2, times = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
-    for i in range(len(xpos2)):
-        l2.append( xpos2[i] )
-    all_pos.append(l2)
-
-
-    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
-    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
-
-    for i in range(basis):
-        dmp1push.weights[i] = result[(2*basis)+i]
-        dmp2push.weights[i] = result[(3*basis)+i]
-
-
-    xpos1, xdot1, xddot1, times = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
-    for i in range(len(xpos1)):
-        all_pos[0].append( xpos1[i] )
-    all_pos[0].append(dmp1push.goal)
-
-    xpos2, xdot2, xddot2, times = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
-    for i in range(len(xpos2)):
-        all_pos[1].append( xpos2[i] )
-    all_pos[1].append(dmp2push.goal)
-
-    # RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)
+    RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)
