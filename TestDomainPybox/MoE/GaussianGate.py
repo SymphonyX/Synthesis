@@ -35,8 +35,7 @@ class GaussianGate(Gate):
         for expert in experts:
             sigma_i = self.sigma[expert.index]
             m_i = expert.mean()
-            if math.isnan(m_i[0,0]):
-                print "a"
+            
             xm_diff = x - m_i
             mult = -0.5 * (xm_diff.dot(np.linalg.pinv(sigma_i)).dot(np.transpose(xm_diff)))
             prod = math.pow((2*math.pi), -n/2.0) * np.power(np.linalg.det(sigma_i), -1.0/2.0)
@@ -50,8 +49,6 @@ class GaussianGate(Gate):
         sum_px = sum(px_times_alpha)
         for i in range(params.shape[0]):
             params[i] = px_times_alpha[i] / sum_px
-            if math.isnan(params[i]):
-                print "A"
 
         return np.transpose(params)[0]
 
@@ -68,6 +65,7 @@ class GaussianGate(Gate):
             raise Exception("Output shape does not align. Output shape: ", expertOutput.shape, " Y: ", y.shape)
 
         exponents = np.array([-0.5 * np.transpose((y - expertOutput[i])).dot((y - expertOutput[i])) for i in xrange(len(experts))])
+        exponents[ exponents < -200.0 ] = -200.0
         temp_hs = (g_xv * np.exp( exponents )).reshape( (len(experts), 1) )
 
         return temp_hs / np.sum(temp_hs, axis=0)

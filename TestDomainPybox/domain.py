@@ -180,7 +180,7 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
     pd_step = 0
     curx, cury, error = 0, 0, 0.0
     while step < len(x1) or thetas_reached == False:
-        # display.fill( (200, 200, 200) )
+        display.fill( (200, 200, 200) )
 
 
         if thetas_reached == True:
@@ -201,8 +201,8 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
         world.Step(dt, 40, 40)
         world.ClearForces()
 
-        # fpsClock.tick(FPS)
-        # UpdateScreen(world, display, height, arm_color)
+        fpsClock.tick(FPS)
+        UpdateScreen(world, display, height, arm_color)
 
         # check for quit
         for event in pygame.event.get():
@@ -216,14 +216,14 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
         print "Step %d/%d" %(step, len(x1))
         print "Error: ", error
 
-        # font = pygame.font.SysFont('Arial', 25)
-        # display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
-        # display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
+        font = pygame.font.SysFont('Arial', 25)
+        display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
+        display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
 
-        # pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
-        # pygame.draw.circle(display, (0, 255, 0), (world.arm.end_effector_position()[0], height-world.arm.end_effector_position()[1]), 10)
+        pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
+        pygame.draw.circle(display, (0, 255, 0), (world.arm.end_effector_position()[0], height-world.arm.end_effector_position()[1]), 10)
 
-        # pygame.display.flip()
+        pygame.display.flip()
 
         object_contact = False
         for edge in world.domain_object.body.contacts:
