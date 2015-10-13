@@ -14,6 +14,29 @@ white = (255, 255, 255)
 arm_color = (50, 50, 50, 200) # fourth value specifies transparency
 
 
+class Obstacle:
+
+    def __init__(self, position, length, width, world):
+        self.position = position
+
+        self.body = world.CreateStaticBody(position=self.position)
+        vertices = [(-length/2,-width/2), (length/2,-width/2), (length/2,width/2), (-length/2, width/2)]
+        shape = b2PolygonShape(vertices=vertices)
+        self.body.CreatePolygonFixture(shape=shape, density=10.0, friction=1.0)
+        self.body.shape = shape
+
+    def draw(self, display, screen_height):
+
+        for fixture in self.body.fixtures:
+            shape=self.body.shape
+
+            vertices=[(self.body.transform*v) for v in shape.vertices]
+            vertices=[(v[0], screen_height-v[1]) for v in vertices]
+
+            pygame.draw.polygon(display, (0, 0, 0, 0), vertices)
+
+
+
 class DomainObject:
 
     def __init__(self, position, color, radius, world, x, y, screen_height):
@@ -52,12 +75,37 @@ def ResetWorld(arm_origin, width, height, xpos, ypos):
     world = b2World(gravity=(0,0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world, x=xpos, y=ypos, screen_height=height)
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
+
+    world.obstacles = [ Obstacle(position=(width/4+80, height/2+170), length=10, width=120, world=world),
+                        Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
+                        Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
+
+                        Obstacle(position=(width/4*2+170, height/2+170), length=10, width=120, world=world),
+                        Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
+                        Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
+
+                        Obstacle(position=(width/2, height/2+340), length=120, width=10, world=world),
+                        Obstacle(position=(width/2+40, height/2+370), length=10, width=50, world=world),
+                        Obstacle(position=(width/2-40, height/2+370), length=10, width=50, world=world),
+
+                        Obstacle(position=(width/2, height/2), length=120, width=10, world=world),
+                        Obstacle(position=(width/2+40, height/2-30), length=10, width=50, world=world),
+                        Obstacle(position=(width/2-40, height/2-30), length=10, width=50, world=world)
+
+                        ]
+
+    # world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=250, world=world) ]
+
+
     world.arm.createBodies(world)
     return world
 
 def UpdateScreen(world, display, height, arm_color):
 
     world.domain_object.draw(display, height)
+
+    for obstacle in world.obstacles:
+        obstacle.draw(display, height)
 
     bodies = [world.arm.link1.body, world.arm.link2.body, world.arm.tool.body1, world.arm.tool.body2]
     colors = [arm_color, arm_color, (0, 0, 255, 0), (0, 0, 255, 0)]
