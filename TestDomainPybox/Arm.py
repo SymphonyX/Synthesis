@@ -22,7 +22,7 @@ class Arm:
         self.basex = basex
         self.basey = basey
 
-    def createBodies(self, world):
+    def createBodies(self, world, tool_parameters=[ (100.0, 0.0), (50.0, math.pi / 2.0) ]):
         self.link1.pos = [ (self.basex, self.basey) ]
         self.link2.pos = [ (self.basex+self.link1.length-20, self.basey) ]
 
@@ -38,11 +38,12 @@ class Arm:
         self.pivot1.CreateFixture(shape=circle, density=0.0, friction=0.0)
         self.pivot1.userData = "pivot1"
 
-        self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
+        self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=1000000000, motorSpeed=0.0)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
 
-        self.tool = Tool(self.pivot_position3[0], self.pivot_position3[1], world, 100.0)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.body1, anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=10000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/2.0, upperAngle=math.pi/2.0)
+
+        self.tool = Tool(self.pivot_position3[0], self.pivot_position3[1], world, tool_parameters[0][0], body_params=tool_parameters)
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.bodies[0], anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/2.0, upperAngle=math.pi/2.0)
 
 
     def set_pivot_positions(self):
@@ -92,12 +93,6 @@ class Arm:
         p3 = self._compute_position(self.joint3.anchorA, self.tool.length, self.joint1.angle+self.joint2.angle+self.joint3.angle)
 
         theta1, theta2, theta3 = self.joint1.angle, self.joint2.angle, self.joint3.angle
-
-        arm_length = self.link1.length + self.link2.length + self.tool.length
-        # target_pivot_distance = math.sqrt( (desired_x - self.joint1.anchorA[0])**2 + (desired_y - self.joint1.anchorA[1])**2 )
-        # if target_pivot_distance > arm_length - 10:
-        #     target[0] -= target_pivot_distance
-        #     target[1] -= target_pivot_distance
 
         iteration = 0
         pi2 = math.pi * 2

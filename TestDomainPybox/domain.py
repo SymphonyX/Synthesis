@@ -24,6 +24,7 @@ class Obstacle:
         shape = b2PolygonShape(vertices=vertices)
         self.body.CreatePolygonFixture(shape=shape, density=10.0, friction=1.0)
         self.body.shape = shape
+        self.body.userData = "obstacle"
 
     def draw(self, display, screen_height):
 
@@ -52,8 +53,8 @@ class DomainObject:
         circle.pos = (0, 0)
         fixture=b2FixtureDef(
                         shape=circle,
-                        density=0.5,
-                        friction=0.1,
+                        density=0.01,
+                        friction=0.01,
                         )
 
         self.body=world.CreateDynamicBody(
@@ -71,11 +72,12 @@ class DomainObject:
         pygame.draw.circle(display, (0, 255, 0, 0), (int(self.target_position[0]), int(screen_height-self.target_position[1])), 10)
 
 
-def ResetWorld(arm_origin, width, height, xpos, ypos):
+def ResetWorld(arm_origin, width, height, xpos, ypos, tool_parameters=[ (100.0, 0.0), (50.0, math.pi / 2.0) ]):
     world = b2World(gravity=(0,0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world, x=xpos, y=ypos, screen_height=height)
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
 
+    # world.obstacles = []
     world.obstacles = [ Obstacle(position=(width/4+80, height/2+170), length=10, width=120, world=world),
                         Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
                         Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
@@ -94,10 +96,9 @@ def ResetWorld(arm_origin, width, height, xpos, ypos):
 
                         ]
 
-    # world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=250, world=world) ]
+    # world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=200, world=world) ]
 
-
-    world.arm.createBodies(world)
+    world.arm.createBodies(world, tool_parameters)
     return world
 
 def UpdateScreen(world, display, height, arm_color):
@@ -107,8 +108,10 @@ def UpdateScreen(world, display, height, arm_color):
     for obstacle in world.obstacles:
         obstacle.draw(display, height)
 
-    bodies = [world.arm.link1.body, world.arm.link2.body, world.arm.tool.body1, world.arm.tool.body2]
-    colors = [arm_color, arm_color, (0, 0, 255, 0), (0, 0, 255, 0)]
+    bodies = [world.arm.link1.body, world.arm.link2.body]
+    bodies.extend( world.arm.tool.bodies )
+    colors = [arm_color, arm_color]
+    colors.extend( world.arm.tool.colors )
     for i, body in enumerate(bodies):
         for fixture in body.fixtures:
             shape=body.shape
@@ -200,13 +203,13 @@ def MoveJointsIteration(joint1, joint2, joint3, printing=False):
 
 
 def UndesiredContact(world):
-    for edge in world.arm.tool.body1.contacts:
+    for edge in world.arm.tool.bodies[0].contacts:
         data1 = edge.contact.fixtureA.body.userData
         data2 = edge.contact.fixtureB.body.userData
         if data1 == "link1" or data1 == "link2" or data2 == "link1" or data2 == "link2":
             return True
 
-    for edge in world.arm.tool.body2.contacts:
+    for edge in world.arm.tool.bodies[1].contacts:
         data1 = edge.contact.fixtureA.body.userData
         data2 = edge.contact.fixtureB.body.userData
         if data1 == "link1" or data1 == "link2" or data2 == "link1" or data2 == "link2":
@@ -287,5 +290,5 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
 
         if UndesiredContact(world):
             contact += 1
-            if contact == 1000:
+            if contact == 2000:
                 break

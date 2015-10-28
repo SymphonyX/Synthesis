@@ -15,6 +15,8 @@ import pickle
 
 tau = 2.0
 basis = 5
+tool_segments = 4
+
 
 width = 1000
 height = 1000
@@ -133,6 +135,16 @@ def normalize_dmp_pos(xpos, xmin=-math.pi * 2, xmax=math.pi * 2):
     return xpos_clean
 
 
+def generate_tool_parameters(params, num_basis, num_segments):
+    pi2 = math.pi * 2.0
+    tool_parameters = []
+    for i in range(num_segments):
+        segment_length = params[num_basis*4+(i*2)] if params[num_basis*4+(i*2)] > 10 else 10
+        segment_angle = params[num_basis*4+(i*2)+1] % pi2
+        tool_parameters.append( (segment_length, segment_angle) )
+    return tool_parameters
+
+
 if __name__ == "__main__":
 
     K = 50.0
@@ -156,11 +168,6 @@ if __name__ == "__main__":
 
     y = 200 * math.sin(target_theta)
     x = 200 * math.cos(target_theta)
-
-    pygame.init()
-    display = pygame.display.set_mode((width, height))
-    fpsClock = pygame.time.Clock()
-    world = ResetWorld(origin, width, height, x, y)
 
 
     if options.load is not None:
@@ -187,6 +194,14 @@ if __name__ == "__main__":
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
         parameters = (prediction * (ymax - ymin)) + ymin
+
+
+
+    pygame.init()
+    display = pygame.display.set_mode((width, height))
+    fpsClock = pygame.time.Clock()
+    tool_parameters = generate_tool_parameters(parameters, basis, tool_segments)
+    world = ResetWorld(origin, width, height, x, y, tool_parameters)
 
 
     dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])

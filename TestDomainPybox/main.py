@@ -15,9 +15,11 @@ from domain import ResetWorld
 from domain import SetJointsIteration
 from domain import MoveJointsIteration
 from domain import RunSimulation
+import math
 
 tau = 2.0
 basis = 5
+tool_segments = 4
 
 width = 1000
 height = 1000
@@ -46,9 +48,23 @@ def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
     return dmps_list
 
 
+def generate_tool_parameters(params, num_basis, num_segments):
+    pi2 = math.pi * 2.0
+    tool_parameters = []
+    for i in range(num_segments):
+        segment_length = params[num_basis*4+(i*2)] if params[num_basis*4+(i*2)] > 50 else 50
+        if segment_length > 200:
+            segment_length = 200
+        segment_angle = 0 if i == 0 else params[num_basis*4+(i*2)+1] % pi2
+        tool_parameters.append( (segment_length, segment_angle) )
+    return tool_parameters
+
+
 def error_func(x):
 
-    world = ResetWorld(origin, width, height, target_x, target_y)
+
+    tool_parameters = generate_tool_parameters(x, basis, tool_segments)
+    world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
     step = 0
 
     starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
@@ -73,6 +89,8 @@ def error_func(x):
     total_error = 0.0
     total_steps = 0
     pd_step = 0
+    obstacle_penalty = 0.0
+
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
 
@@ -92,9 +110,9 @@ def error_func(x):
         pd_step += 1
         world.Step(dt, 40, 40)
         world.ClearForces()
-        if pd_step == 1000:
+        if pd_step == 2000:
             print "Escaping..."
-            penalty = 10000000
+            penalty = 100
             break
 
 
@@ -107,6 +125,16 @@ def error_func(x):
             data2 = edge.contact.fixtureB.body.userData
             if data1 == "tool1" or data1 == "tool2" or data2 == "tool1" or data2 == "tool2":
                 object_contact = True
+            if data1 == "obstacle" or data2 == "obstacle":
+                obstacle_penalty += 10
+
+        for body in world.arm.tool.bodies:
+            for edge in body.contacts:
+                data1 = edge.contact.fixtureA.body.userData
+                data2 = edge.contact.fixtureB.body.userData
+                if data1 == "obstacle" or data2 == "obstacle":
+                    obstacle_penalty += 100
+
 
         if object_contact == False:
             world.domain_object.body.angularVelocity = 0.0
@@ -120,7 +148,10 @@ def error_func(x):
 
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] -  world.domain_object.body.position[1])**2)
-    cost = (1000 * error) + np.linalg.norm(x) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+    tool_length = 0.0
+    for i in range(tool_segments):
+        tool_length += x[basis*4+i*2]
+    cost = (1000 * error) + (penalty * 0.01 * (len(all_pos[0])-step)) + obstacle_penalty#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
 
     global best_error
     global best_params
@@ -135,8 +166,9 @@ def error_func(x):
     print "\nError: ", error
     print "X: ", target_x, " Y: ", target_y
     print "Best Error: ", best_distance
-    print "Trajectory length: ", sum_distances
+    print "Obstacle Penalty: ", obstacle_penalty
     print "Cost: ", cost
+    print "Tool params: ", tool_parameters
 
     return cost
 
@@ -200,13 +232,25 @@ if __name__ == '__main__':
                 if params is None:
                     params_file = open(options.params, "r")
                     params = pickle.load(params_file)
-                epsilons = np.zeros( (basis*4) )
+                epsilons = np.zeros( (basis*4 + tool_segments*2) )
                 epsilons[:] = 10.5
+                for i in range(tool_segments):
+                    epsilons[(basis*4)+(2*i)] = 10.0
+                    epsilons[(basis*4)+(2*i+1)] = 1.5
                 iterations = 5
             elif options.params is None:
-                params = np.random.uniform( -40, 40, (basis*4, 1) )
-                epsilons = np.zeros( (basis*4) )
+                params = np.zeros( (basis*4 + tool_segments * 2, 1) )
+                epsilons = np.zeros( (basis*4 + tool_segments * 2) )
                 epsilons[:] = 10.0
+
+                params[:basis*4] = np.random.uniform(-1000, 1000)
+                for i in range(tool_segments):
+                    params[(basis*4)+(2*i)] = np.random.uniform(50, 200)
+                    params[(basis*4)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
+
+                    epsilons[(basis*4)+(2*i)] = 10.0
+                    epsilons[(basis*4)+(2*i+1)] = 1.0
+
 
             for i in range(iterations):
                 status_file = open("status.txt", "w")
@@ -217,7 +261,7 @@ if __name__ == '__main__':
                 result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
                 epsilons[:] = epsilons[:] / 10.0
 
-                #params = best_params
+                params = best_params
 
         print "Best error: ", best_error
         print "Best params: ", best_params
@@ -239,7 +283,9 @@ if __name__ == '__main__':
     pygame.init()
     display = pygame.display.set_mode((width, height))
     fpsClock = pygame.time.Clock()
-    world = ResetWorld(origin, width, height, target_x, target_y)
+
+    tool_parameters = generate_tool_parameters(result, basis, tool_segments)
+    world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
 
     starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
                 world.domain_object.body.position[0], world.domain_object.body.position[1]]
