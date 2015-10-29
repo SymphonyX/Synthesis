@@ -37,6 +37,10 @@ target_x = 0.0
 target_y = 0.0
 
 
+num_reach_dmps = 2
+num_push_dmps = 2
+total_dmps = num_push_dmps + num_reach_dmps
+
 def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 
     dmps_list = []
@@ -52,25 +56,48 @@ def generate_tool_parameters(params, num_basis, num_segments):
     pi2 = math.pi * 2.0
     tool_parameters = []
     for i in range(num_segments):
-        segment_length = params[num_basis*4+(i*2)] if params[num_basis*4+(i*2)] > 50 else 50
+        segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
         if segment_length > 200:
             segment_length = 200
-        segment_angle = 0 if i == 0 else params[num_basis*4+(i*2)+1] % pi2
+        segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
         tool_parameters.append( (segment_length, segment_angle) )
     return tool_parameters
 
 
-def error_func(x):
+def generate_starts_and_goals_lists(params, world):
+    goals, starts = [], []
+    for i in range(total_dmps):
+        if i < num_reach_dmps-1:
+            start_index = (basis*total_dmps*2)+(tool_segments*2)
+            goals.append( params[start_index + (2*i)] )
+            goals.append( params[start_index + (2*i+1)] )
+        elif i == num_reach_dmps-1:
+            goals.append( world.domain_object.body.position[0] )
+            goals.append( world.domain_object.body.position[1] )
+        elif i < total_dmps-1: #Skip the goal of reaching, that's fixed
+            start_index = (basis*total_dmps*2)+(tool_segments*2)
+            goals.append( params[start_index + (2*(i-1))] )
+            goals.append( params[start_index + (2*(i-1)+1)] )
+        else:
+            goals.append( world.domain_object.target_position[0] )
+            goals.append( world.domain_object.target_position[1] )
 
+        if i == 0:
+            starts.append( world.arm.pivot_position3[0]+world.arm.tool.length )
+            starts.append( world.arm.pivot_position3[1] )
+        else:
+            starts.append( goals[-2] )
+            starts.append( goals[-1] )
+
+    return starts, goals
+
+def error_func(x):
 
     tool_parameters = generate_tool_parameters(x, basis, tool_segments)
     world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
     step = 0
 
-    starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
-                world.domain_object.body.position[0], world.domain_object.body.position[1]]
-    goals = [world.domain_object.body.position[0], world.domain_object.body.position[1], 
-                world.domain_object.target_position[0], world.domain_object.target_position[1]]
+    starts, goals = generate_starts_and_goals_lists(x, world)
 
     dmps_list = generate_dmps_from_parameters(x, basis, starts, goals, K, D)
 
@@ -150,8 +177,8 @@ def error_func(x):
                                    + (world.domain_object.target_position[1] -  world.domain_object.body.position[1])**2)
     tool_length = 0.0
     for i in range(tool_segments):
-        tool_length += x[basis*4+i*2]
-    cost = (1000 * error) + (penalty * 0.01 * (len(all_pos[0])-step)) + obstacle_penalty#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+        tool_length += x[basis*total_dmps*2+i*2]
+    cost = (1000 * error)  + obstacle_penalty #+ (penalty * 0.01 * (len(all_pos[0])-step))#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
 
     global best_error
     global best_params
@@ -225,31 +252,42 @@ if __name__ == '__main__':
         result = pickle.load(param_file)
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 1
+        outer_iter = 1 if options.params is not None else 10
         for j in range(outer_iter):
             iterations = 1
             if options.params is not None:
                 if params is None:
                     params_file = open(options.params, "r")
                     params = pickle.load(params_file)
-                epsilons = np.zeros( (basis*4 + tool_segments*2) )
+                epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2 + (num_reach_dmps-1 + num_push_dmps-1)*2) )
                 epsilons[:] = 10.5
                 for i in range(tool_segments):
-                    epsilons[(basis*4)+(2*i)] = 10.0
-                    epsilons[(basis*4)+(2*i+1)] = 1.5
+                    epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+                    epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
+                epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+
                 iterations = 5
+
             elif options.params is None:
-                params = np.zeros( (basis*4 + tool_segments * 2, 1) )
-                epsilons = np.zeros( (basis*4 + tool_segments * 2) )
+                params = np.zeros( ((basis*total_dmps*2 )
+                                    + tool_segments * 2
+                                    + (num_reach_dmps-1 + num_push_dmps-1)*2, 1) )
+                epsilons = np.zeros( ((basis*total_dmps*2 )
+                                    + tool_segments * 2
+                                    + (num_reach_dmps-1 + num_push_dmps-1)*2) )
                 epsilons[:] = 10.0
 
-                params[:basis*4] = np.random.uniform(-1000, 1000)
+                params[:basis*total_dmps*2] = np.random.uniform(-10, 10)
                 for i in range(tool_segments):
-                    params[(basis*4)+(2*i)] = np.random.uniform(50, 200)
-                    params[(basis*4)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
+                    params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
+                    params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
 
-                    epsilons[(basis*4)+(2*i)] = 10.0
-                    epsilons[(basis*4)+(2*i+1)] = 1.0
+                    epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+                    epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.2
+
+                params[(basis*total_dmps*2)+(2*tool_segments):] = np.random.uniform(-100, 100)
+                epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+
 
 
             for i in range(iterations):
@@ -287,10 +325,7 @@ if __name__ == '__main__':
     tool_parameters = generate_tool_parameters(result, basis, tool_segments)
     world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
 
-    starts = [world.arm.pivot_position3[0]+world.arm.tool.length, world.arm.pivot_position3[1],
-                world.domain_object.body.position[0], world.domain_object.body.position[1]]
-    goals = [world.domain_object.body.position[0], world.domain_object.body.position[1], 
-                world.domain_object.target_position[0], world.domain_object.target_position[1]]
+    starts, goals = generate_starts_and_goals_lists(result, world)
 
     dmps_list = generate_dmps_from_parameters(result, basis, starts, goals, K, D)
 

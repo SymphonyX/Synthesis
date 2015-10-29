@@ -78,25 +78,25 @@ def ResetWorld(arm_origin, width, height, xpos, ypos, tool_parameters=[ (100.0, 
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
 
     # world.obstacles = []
-    world.obstacles = [ Obstacle(position=(width/4+80, height/2+170), length=10, width=120, world=world),
-                        Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
-                        Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
+    # world.obstacles = [ Obstacle(position=(width/4+80, height/2+170), length=10, width=120, world=world),
+    #                     Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
+    #                     Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
+    #
+    #                     Obstacle(position=(width/4*2+170, height/2+170), length=10, width=120, world=world),
+    #                     Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
+    #                     Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
+    #
+    #                     Obstacle(position=(width/2, height/2+340), length=120, width=10, world=world),
+    #                     Obstacle(position=(width/2+40, height/2+370), length=10, width=50, world=world),
+    #                     Obstacle(position=(width/2-40, height/2+370), length=10, width=50, world=world),
+    #
+    #                     Obstacle(position=(width/2, height/2), length=120, width=10, world=world),
+    #                     Obstacle(position=(width/2+40, height/2-30), length=10, width=50, world=world),
+    #                     Obstacle(position=(width/2-40, height/2-30), length=10, width=50, world=world)
+    #
+    #                     ]
 
-                        Obstacle(position=(width/4*2+170, height/2+170), length=10, width=120, world=world),
-                        Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
-                        Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
-
-                        Obstacle(position=(width/2, height/2+340), length=120, width=10, world=world),
-                        Obstacle(position=(width/2+40, height/2+370), length=10, width=50, world=world),
-                        Obstacle(position=(width/2-40, height/2+370), length=10, width=50, world=world),
-
-                        Obstacle(position=(width/2, height/2), length=120, width=10, world=world),
-                        Obstacle(position=(width/2+40, height/2-30), length=10, width=50, world=world),
-                        Obstacle(position=(width/2-40, height/2-30), length=10, width=50, world=world)
-
-                        ]
-
-    # world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=200, world=world) ]
+    world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=200, world=world) ]
 
     world.arm.createBodies(world, tool_parameters)
     return world
