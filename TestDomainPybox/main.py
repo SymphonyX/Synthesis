@@ -19,7 +19,7 @@ import math
 
 tau = 2.0
 basis = 5
-tool_segments = 4
+tool_segments = 2
 
 width = 1000
 height = 1000
@@ -37,8 +37,8 @@ target_x = 0.0
 target_y = 0.0
 
 
-num_reach_dmps = 2
-num_push_dmps = 2
+num_reach_dmps = 1
+num_push_dmps = 1
 total_dmps = num_push_dmps + num_reach_dmps
 
 def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
@@ -55,12 +55,16 @@ def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 def generate_tool_parameters(params, num_basis, num_segments):
     pi2 = math.pi * 2.0
     tool_parameters = []
-    for i in range(num_segments):
-        segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
-        if segment_length > 200:
-            segment_length = 200
-        segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
-        tool_parameters.append( (segment_length, segment_angle) )
+    # for i in range(num_segments):
+    #     segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
+    #     if segment_length > 200:
+    #         segment_length = 200
+    #     segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
+    #     tool_parameters.append( (segment_length, segment_angle) )
+
+    tool_parameters.append( (100.0, 0.0) )
+    tool_parameters.append( (50.0, math.pi / 2.0) )
+    
     return tool_parameters
 
 
@@ -86,8 +90,8 @@ def generate_starts_and_goals_lists(params, world):
             starts.append( world.arm.pivot_position3[0]+world.arm.tool.length )
             starts.append( world.arm.pivot_position3[1] )
         else:
-            starts.append( goals[-2] )
-            starts.append( goals[-1] )
+            starts.append( goals[-4] )
+            starts.append( goals[-3] )
 
     return starts, goals
 
@@ -138,7 +142,7 @@ def error_func(x):
         world.Step(dt, 40, 40)
         world.ClearForces()
         if pd_step == 2000:
-            print "Escaping..."
+            print "Escaping..." 
             penalty = 100
             break
 
@@ -178,7 +182,7 @@ def error_func(x):
     tool_length = 0.0
     for i in range(tool_segments):
         tool_length += x[basis*total_dmps*2+i*2]
-    cost = (1000 * error)  + obstacle_penalty #+ (penalty * 0.01 * (len(all_pos[0])-step))#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+    cost = (1000 * error)  + obstacle_penalty + (penalty * 0.01 * (len(all_pos[0])-step))#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
 
     global best_error
     global best_params

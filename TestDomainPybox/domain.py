@@ -5,9 +5,9 @@ from Box2D import *
 from Arm import Arm
 from PID import PID
 
-PD1 = PID(P=200.0, I=0.0, D=10000.0)
-PD2 = PID(P=150.0, I=0.0, D=7000.0)
-PD3 = PID(P=100.0, I=0.0, D=5000.0)
+PD1 = PID(P=200.0, I=0.0, D=1000.0)
+PD2 = PID(P=150.0, I=0.0, D=700.0)
+PD3 = PID(P=100.0, I=0.0, D=500.0)
 
 black = (0, 0, 0)
 white = (255, 255, 255)
@@ -175,13 +175,13 @@ def SetJointsIteration(theta1, theta2, theta3, world):
 
 
 def MoveJointsIteration(joint1, joint2, joint3, printing=False):
-    speed1 = PD1.update(joint1.angle) * 1000
+    speed1 = PD1.update(joint1.angle) * 100
     joint1.motorSpeed = speed1
 
-    speed2 = PD2.update(joint2.angle) * 1000
+    speed2 = PD2.update(joint2.angle) * 100
     joint2.motorSpeed = speed2
 
-    speed3 = PD3.update(joint3.angle) * 1000
+    speed3 = PD3.update(joint3.angle) * 100
     joint3.motorSpeed = speed3
 
 
@@ -288,7 +288,6 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
             world.domain_object.body.linearVelocity = b2Vec2(0,0)
 
 
-        if UndesiredContact(world):
-            contact += 1
-            if contact == 2000:
-                break
+        if pd_step == 2000:
+            print "Escaping..."
+            break
