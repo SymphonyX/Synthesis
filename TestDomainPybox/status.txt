@@ -1,1 +1,1 @@
-Theta: 1.5Outer: 4 Inner: 0
+Theta: 0.0Outer: 0 Inner: 0

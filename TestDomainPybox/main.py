@@ -285,11 +285,28 @@ if __name__ == '__main__':
     parser.add_option("-t", "--theta", action="store", help="target theta", type="float")
     parser.add_option("-p", "--params", action="store", help="parameters initial values", type="string")
 
+    parser.add_option("--basis", action="store", help="number of basis", type="int")
+    parser.add_option("--reach", action="store", help="num reach dmps", type="int")
+    parser.add_option("--push", action="store", help="num push dmps", type="int")
+    parser.add_option("--tool", action="store", help="num tool segments", type="int")
+
+
     global goals_grid
     global best_goals
 
-
     (options, args) = parser.parse_args()
+
+    if options.basis is not None:
+        basis = options.basis
+    if options.reach is not None:
+        num_reach_dmps = options.reach
+    if options.push is not None:
+        num_push_dmps = options.push
+    if options.tool is not None:
+        tool_segments = options.tool
+    total_dmps = num_push_dmps + num_reach_dmps
+
+
     if options.theta is not None:
         target_x = 200 * math.cos(options.theta)
         target_y = 200 * math.sin(options.theta)

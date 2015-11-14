@@ -30,7 +30,6 @@ class Arm:
         self.link1.createBody(world, "link1", density=2.0)
         self.link2.createBody(world, "link2", density=0.5)
 
-
         self.set_pivot_positions()
 
         self.pivot1 = world.CreateKinematicBody(position=self.pivot_position1)

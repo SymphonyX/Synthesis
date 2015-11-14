@@ -15,26 +15,35 @@ arm_color = (50, 50, 50, 200) # fourth value specifies transparency
 
 
 class Obstacle:
-
     def __init__(self, position, length, width, world):
         self.position = position
 
-        self.body = world.CreateStaticBody(position=self.position)
-        vertices = [(-length/2,-width/2), (length/2,-width/2), (length/2,width/2), (-length/2, width/2)]
-        shape = b2PolygonShape(vertices=vertices)
-        self.body.CreatePolygonFixture(shape=shape, density=10.0, friction=1.0)
-        self.body.shape = shape
+        # self.body = world.CreateStaticBody(position=self.position)
+        # vertices = [(-length/2,-width/2), (length/2,-width/2), (length/2,width/2), (-length/2, width/2)]
+        # shape = b2PolygonShape(vertices=vertices)
+        # self.body.CreatePolygonFixture(shape=shape, density=10.0, friction=1.0)
+        #
+        circle = b2CircleShape()
+        circle.radius = 20
+        circle.pos = (0, 0)
+        fixture=b2FixtureDef(shape=circle, density=0.0, friction=0.0)
+
+        self.body=world.CreateStaticBody(position=self.position, fixtures=fixture)
+
+        self.body.shape = circle
         self.body.userData = "obstacle"
 
     def draw(self, display, screen_height):
 
-        for fixture in self.body.fixtures:
-            shape=self.body.shape
+        pygame.draw.circle(display, (0, 0, 0, 0), (int(self.body.position[0]), screen_height-int(self.body.position[1])), int(self.body.shape.radius))
 
-            vertices=[(self.body.transform*v) for v in shape.vertices]
-            vertices=[(v[0], screen_height-v[1]) for v in vertices]
-
-            pygame.draw.polygon(display, (0, 0, 0, 0), vertices)
+        # for fixture in self.body.fixtures:
+        #     shape=self.body.shape
+        #
+        #     vertices=[(self.body.transform*v) for v in shape.vertices]
+        #     vertices=[(v[0], screen_height-v[1]) for v in vertices]
+        #
+        #     pygame.draw.polygon(display, (0, 0, 0, 0), vertices)
 
 
 
@@ -53,7 +62,7 @@ class DomainObject:
         circle.pos = (0, 0)
         fixture=b2FixtureDef(
                         shape=circle,
-                        density=0.01,
+                        density=0.1,
                         friction=0.01,
                         )
 
@@ -73,16 +82,16 @@ class DomainObject:
 
 
 def ResetWorld(arm_origin, width, height, xpos, ypos, tool_parameters=[ (100.0, 0.0), (50.0, math.pi / 2.0) ]):
-    world = b2World(gravity=(0,0), doSleep=True)
+    world = b2World(gravity=(0.0,0.0), doSleep=True)
     world.domain_object = DomainObject(position=(width/2, height/3), color=(255,0,0), radius=15, world=world, x=xpos, y=ypos, screen_height=height)
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
 
     # world.obstacles = []
-    world.obstacles = [ Obstacle(position=(width/4+100, height/2+170), length=10, width=120, world=world),
+    world.obstacles = [ Obstacle(position=(width/4+120, height/2+170), length=10, width=120, world=world),
                         # Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
                         # Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
 
-                        Obstacle(position=(width/4*2+150, height/2+170), length=10, width=120, world=world),
+                        Obstacle(position=(width/4*2+120, height/2+170), length=10, width=120, world=world),
                         # Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
                         # Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
 
