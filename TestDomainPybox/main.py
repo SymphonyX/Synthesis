@@ -18,8 +18,8 @@ from domain import RunSimulation
 import math
 
 tau = 2.0
-basis = 5
-tool_segments = 2
+basis = 3
+tool_segments = 4
 
 width = 1000
 height = 1000
@@ -36,10 +36,12 @@ best_distance = float("inf")
 target_x = 0.0
 target_y = 0.0
 
-
-num_reach_dmps = 1
-num_push_dmps = 1
+num_reach_dmps = 2
+num_push_dmps = 2
 total_dmps = num_push_dmps + num_reach_dmps
+
+goals_grid = [ 0 ] * ((num_reach_dmps-1+num_push_dmps-1) * 2)
+best_goals = [ 0 ] * ((num_reach_dmps-1+num_push_dmps-1) * 2)
 
 def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 
@@ -55,33 +57,32 @@ def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 def generate_tool_parameters(params, num_basis, num_segments):
     pi2 = math.pi * 2.0
     tool_parameters = []
-    # for i in range(num_segments):
-    #     segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
-    #     if segment_length > 200:
-    #         segment_length = 200
-    #     segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
-    #     tool_parameters.append( (segment_length, segment_angle) )
+    for i in range(num_segments):
+        segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
+        if segment_length > 200:
+            segment_length = 200
+        segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
+        tool_parameters.append( (segment_length, segment_angle) )
 
-    tool_parameters.append( (100.0, 0.0) )
-    tool_parameters.append( (50.0, math.pi / 2.0) )
+    # tool_parameters.append( (100.0, 0.0) )
+    # tool_parameters.append( (50.0, math.pi / 2.0) )
     
     return tool_parameters
 
 
-def generate_starts_and_goals_lists(params, world):
+def generate_starts_and_goals_lists(goal_params, world):
+
     goals, starts = [], []
     for i in range(total_dmps):
         if i < num_reach_dmps-1:
-            start_index = (basis*total_dmps*2)+(tool_segments*2)
-            goals.append( params[start_index + (2*i)] )
-            goals.append( params[start_index + (2*i+1)] )
+            goals.append( goal_params[2*i] )
+            goals.append( goal_params[2*i+1] )
         elif i == num_reach_dmps-1:
             goals.append( world.domain_object.body.position[0] )
             goals.append( world.domain_object.body.position[1] )
         elif i < total_dmps-1: #Skip the goal of reaching, that's fixed
-            start_index = (basis*total_dmps*2)+(tool_segments*2)
-            goals.append( params[start_index + (2*(i-1))] )
-            goals.append( params[start_index + (2*(i-1)+1)] )
+            goals.append( goal_params[(2*(i-1))] )
+            goals.append( goal_params[(2*(i-1)+1)] )
         else:
             goals.append( world.domain_object.target_position[0] )
             goals.append( world.domain_object.target_position[1] )
@@ -95,32 +96,39 @@ def generate_starts_and_goals_lists(params, world):
 
     return starts, goals
 
+def positions_from_dmps(dmp_list):
+    all_pos = [ [], [] ]
+    for i, dmp in enumerate(dmp_list):
+        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
+        for j in range( len(xpos) ):
+            all_pos[ (i % 2) ].append( xpos[j] )
+
+    all_pos[0].append( dmp_list[-2].goal ) #Append x target position
+    all_pos[1].append( dmp_list[-1].goal ) #Append y target position
+
+    return all_pos
+
 def error_func(x):
 
     tool_parameters = generate_tool_parameters(x, basis, tool_segments)
     world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
     step = 0
 
-    starts, goals = generate_starts_and_goals_lists(x, world)
+    global goals_grid
+    starts, goals = generate_starts_and_goals_lists(goals_grid, world)
 
     dmps_list = generate_dmps_from_parameters(x, basis, starts, goals, K, D)
 
-    all_pos = [ [], [] ]
-    for i, dmp in enumerate(dmps_list):
-        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
-        for j in range( len(xpos) ):
-            all_pos[ (i % 2) ].append( xpos[j] )
+    print "Goals ", goals
 
-    all_pos[0].append( dmps_list[2].goal ) #Append x target position
-    all_pos[1].append( dmps_list[3].goal ) #Append y target position
+    all_pos = positions_from_dmps(dmps_list)
 
     sum_distances = 0
 
     thetas_reached = True
-    total_error = 0.0
-    total_steps = 0
     pd_step = 0
     obstacle_penalty = 0.0
+    obj_contact_penalty = 0.0
 
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
@@ -143,7 +151,7 @@ def error_func(x):
         world.ClearForces()
         if pd_step == 2000:
             print "Escaping..." 
-            penalty = 100
+            penalty = 10000
             break
 
 
@@ -154,7 +162,7 @@ def error_func(x):
         for edge in world.domain_object.body.contacts:
             data1 = edge.contact.fixtureA.body.userData
             data2 = edge.contact.fixtureB.body.userData
-            if data1 == "tool1" or data1 == "tool2" or data2 == "tool1" or data2 == "tool2":
+            if data1.startswith("tool") or data2.startswith("tool"):
                 object_contact = True
             if data1 == "obstacle" or data2 == "obstacle":
                 obstacle_penalty += 10
@@ -170,28 +178,25 @@ def error_func(x):
         if object_contact == False:
             world.domain_object.body.angularVelocity = 0.0
             world.domain_object.body.linearVelocity = b2Vec2(0,0)
+            obj_contact_penalty += 100.0
 
-
-        current_error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - world.domain_object.body.position[1])**2)
-        total_error += current_error
-        total_steps += 1
 
 
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] -  world.domain_object.body.position[1])**2)
-    tool_length = 0.0
-    for i in range(tool_segments):
-        tool_length += x[basis*total_dmps*2+i*2]
-    cost = (1000 * error)  + obstacle_penalty + (penalty * 0.01 * (len(all_pos[0])-step))#tool_length + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+
+    cost = (1000 * error)  + obstacle_penalty + obj_contact_penalty + penalty + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
 
     global best_error
     global best_params
     global best_distance
+    global best_goals
 
-    if cost <= best_error:
+    if error <= best_distance:
         best_error = cost
-        best_params = x
+        best_params = list(x)
         best_distance = error
+        best_goals = list(goals_grid)
 
     #print "\nAvg Error: ", (total_error/total_steps)
     print "\nError: ", error
@@ -223,7 +228,50 @@ def diff_demonstration(demonstration, time):
     return demonstration, velocities, accelerations, times
 
 
+def seed_parameters(options):
+    params_file = open(options.params, "r")
+    data = pickle.load(params_file)
+    params = data[0]
+    global goals_grid
+    global num_push_dmps
+    global num_reach_dmps
+    global basis
+    global tool_segments
+    global total_dmps
 
+    goals_grid = data[1]
+    num_push_dmps = data[2]
+    num_reach_dmps = data[3]
+    total_dmps = num_push_dmps + num_reach_dmps
+    tool_segments = data[4]
+    basis = data[5]
+
+    epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2) )
+    epsilons[:] = 10.5
+    for i in range(tool_segments):
+        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+        epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
+    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+
+    return params, epsilons
+
+
+def new_parameters():
+    params = np.zeros( ((basis*total_dmps*2 )
+                        + tool_segments * 2, 1) )
+    epsilons = np.zeros( ((basis*total_dmps*2 )
+                        + tool_segments * 2) )
+    epsilons[:] = 10.0
+
+    params[:basis*total_dmps*2] = np.random.uniform(-10, 10)
+    for i in range(tool_segments):
+        params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
+        params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
+
+        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+        epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.2
+
+    return params, epsilons
 
 
 if __name__ == '__main__':
@@ -236,6 +284,9 @@ if __name__ == '__main__':
     parser.add_option("-y", "--ypos", action="store", help="target y", type="float")
     parser.add_option("-t", "--theta", action="store", help="target theta", type="float")
     parser.add_option("-p", "--params", action="store", help="parameters initial values", type="string")
+
+    global goals_grid
+    global best_goals
 
 
     (options, args) = parser.parse_args()
@@ -253,67 +304,90 @@ if __name__ == '__main__':
     if options.load is not None:
         print "Loading params from file"
         param_file = open(options.load, "r")
-        result = pickle.load(param_file)
+        data = pickle.load(param_file)
+        result = data[0]
+        best_goals = data[1]
+        num_push_dmps = data[2]
+        num_reach_dmps = data[3]
+        total_dmps = num_push_dmps + num_reach_dmps
+        tool_segments = data[4]
+        basis = data[5]
     else:
         params = None
-        outer_iter = 1 if options.params is not None else 10
-        for j in range(outer_iter):
-            iterations = 1
-            if options.params is not None:
-                if params is None:
-                    params_file = open(options.params, "r")
-                    params = pickle.load(params_file)
-                epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2 + (num_reach_dmps-1 + num_push_dmps-1)*2) )
-                epsilons[:] = 10.5
-                for i in range(tool_segments):
-                    epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-                    epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
-                epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+        iterations = 1
+        if options.params is not None:
+            params, epsilons = seed_parameters(options)
+            iterations = 5
 
-                iterations = 5
-
-            elif options.params is None:
-                params = np.zeros( ((basis*total_dmps*2 )
-                                    + tool_segments * 2
-                                    + (num_reach_dmps-1 + num_push_dmps-1)*2, 1) )
-                epsilons = np.zeros( ((basis*total_dmps*2 )
-                                    + tool_segments * 2
-                                    + (num_reach_dmps-1 + num_push_dmps-1)*2) )
-                epsilons[:] = 10.0
-
-                params[:basis*total_dmps*2] = np.random.uniform(-10, 10)
-                for i in range(tool_segments):
-                    params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
-                    params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
-
-                    epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-                    epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.2
-
-                params[(basis*total_dmps*2)+(2*tool_segments):] = np.random.uniform(-100, 100)
-                epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+        elif options.params is None:
+            params, epsilons = new_parameters()
 
 
+        max_vals = [1000.0] * len(goals_grid)
+        min_vals = [0.0] * len(goals_grid)
+        num_steps = 2
 
-            for i in range(iterations):
-                status_file = open("status.txt", "w")
-                status_file.write("Theta: " + str(options.theta) )
-                status_file.write("Outer: " + str(j) + " Inner: " + str(i))
-                status_file.close()
+        last_index = len(goals_grid)-1
+        for k in range(3):
+            j = -1
+            while True:
+                j += 1
 
-                result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
-                epsilons[:] = epsilons[:] / 10.0
+                for i in range(iterations):
+                    status_file = open("status.txt", "w")
+                    status_file.write("Theta: " + str(options.theta) )
+                    status_file.write("Outer: " + str(j) + " Inner: " + str(i))
+                    status_file.close()
 
-                params = best_params
+                    result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
+                    epsilons[:] = epsilons[:] / 10.0
+
+                    params = best_params
+
+                index = last_index
+                while True:
+                    if goals_grid[index] == max_vals[index]:
+                        goals_grid[index] = min_vals[index]
+                        index -= 1
+                    else:
+                        step = (max_vals[index] - min_vals[index]) / num_steps
+                        goals_grid[index] += step
+                        break
+
+                    if index == -1:
+                        break
+
+                if options.params is not None or index == -1:
+                    break
+
+
+            if best_error > 30.0:
+                for index in range(len(goals_grid)):
+                    best_val = best_goals[index]
+                    goals_grid[index] = best_val
+                    step = (max_vals[index] - min_vals[index]) / num_steps
+
+                    if best_val == min_vals[index]:
+                        max_vals[index] = min_vals[index] + step
+                    elif best_val == max_vals[index]:
+                        min_vals[index] = max_vals[index] - step
+                    else:
+                        max_vals[index] = best_val + (step / 2.0)
+                        min_vals[index] = best_val - (step / 2.0)
+
+
 
         print "Best error: ", best_error
         print "Best params: ", best_params
+        print "Best goals: ", best_goals
         print "Best distances: ", best_distance, "\n\n"
+
 
         result = best_params
 
         filename = "params.pkl" if options.save is None else options.save
         param_file = open(filename, "w")
-        pickle.dump(result, param_file)
+        pickle.dump([result, best_goals, num_push_dmps, num_reach_dmps, tool_segments, basis], param_file)
         error_filename = filename.split(".")[0] + "_error.txt"
         error_file = open(error_filename, "w")
         error_file.write("Error: " + str(best_distance))
@@ -321,25 +395,18 @@ if __name__ == '__main__':
         error_file.close()
         param_file.close()
 
-
     pygame.init()
     display = pygame.display.set_mode((width, height))
     fpsClock = pygame.time.Clock()
 
+
     tool_parameters = generate_tool_parameters(result, basis, tool_segments)
     world = ResetWorld(origin, width, height, target_x, target_y, tool_parameters)
 
-    starts, goals = generate_starts_and_goals_lists(result, world)
+    starts, goals = generate_starts_and_goals_lists(best_goals, world)
 
     dmps_list = generate_dmps_from_parameters(result, basis, starts, goals, K, D)
 
-    all_pos = [ [], [] ]
-    for i, dmp in enumerate(dmps_list):
-        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
-        for j in range( len(xpos) ):
-            all_pos[ (i % 2) ].append( xpos[j] )
-
-    all_pos[0].append( dmps_list[2].goal ) #Append x target position
-    all_pos[1].append( dmps_list[3].goal ) #Append y target position
+    all_pos = positions_from_dmps(dmps_list)
 
     RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)

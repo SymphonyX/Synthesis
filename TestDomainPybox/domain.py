@@ -78,25 +78,25 @@ def ResetWorld(arm_origin, width, height, xpos, ypos, tool_parameters=[ (100.0, 
     world.arm = Arm(arm_origin[0], arm_origin[1], 250, 200)
 
     # world.obstacles = []
-    # world.obstacles = [ Obstacle(position=(width/4+80, height/2+170), length=10, width=120, world=world),
-    #                     Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
-    #                     Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
-    #
-    #                     Obstacle(position=(width/4*2+170, height/2+170), length=10, width=120, world=world),
-    #                     Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
-    #                     Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
-    #
-    #                     Obstacle(position=(width/2, height/2+340), length=120, width=10, world=world),
-    #                     Obstacle(position=(width/2+40, height/2+370), length=10, width=50, world=world),
-    #                     Obstacle(position=(width/2-40, height/2+370), length=10, width=50, world=world),
-    #
-    #                     Obstacle(position=(width/2, height/2), length=120, width=10, world=world),
-    #                     Obstacle(position=(width/2+40, height/2-30), length=10, width=50, world=world),
-    #                     Obstacle(position=(width/2-40, height/2-30), length=10, width=50, world=world)
-    #
-    #                     ]
+    world.obstacles = [ Obstacle(position=(width/4+100, height/2+170), length=10, width=120, world=world),
+                        # Obstacle(position=(width/4+50, height/2+130), length=50, width=10, world=world),
+                        # Obstacle(position=(width/4+50, height/2+210), length=50, width=10, world=world),
 
-    world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=200, world=world) ]
+                        Obstacle(position=(width/4*2+150, height/2+170), length=10, width=120, world=world),
+                        # Obstacle(position=(width/4*2+200, height/2+130), length=50, width=10, world=world),
+                        # Obstacle(position=(width/4*2+200, height/2+210), length=50, width=10, world=world),
+
+                        Obstacle(position=(width/2, height/2+320), length=120, width=10, world=world),
+                        # Obstacle(position=(width/2+40, height/2+370), length=10, width=50, world=world),
+                        # Obstacle(position=(width/2-40, height/2+370), length=10, width=50, world=world),
+
+                        Obstacle(position=(width/2, height/2+20), length=120, width=10, world=world),
+                        # Obstacle(position=(width/2+40, height/2-30), length=10, width=50, world=world),
+                        # Obstacle(position=(width/2-40, height/2-30), length=10, width=50, world=world)
+
+                        ]
+
+    # world.obstacles = [ Obstacle(position=(width/4+150, height/2+170), length=10, width=200, world=world) ]
 
     world.arm.createBodies(world, tool_parameters)
     return world
@@ -269,6 +269,7 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
 
         font = pygame.font.SysFont('Arial', 25)
         display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
+        display.blit(font.render('Next Waypoint: (' + str(curx) + "," + str(cury) + ")", True, (0,0,0)), (200, 200))
         display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
 
         pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
@@ -280,7 +281,7 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
         for edge in world.domain_object.body.contacts:
             data1 = edge.contact.fixtureA.body.userData
             data2 = edge.contact.fixtureB.body.userData
-            if data1 == "tool1" or data1 == "tool2" or data2 == "tool1" or data2 == "tool2":
+            if data1.startswith("tool") or data2.startswith("tool"):
                 object_contact = True
 
         if object_contact == False:
