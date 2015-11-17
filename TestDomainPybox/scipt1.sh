@@ -1,0 +1,13 @@
+python main.py -t 4.4 -s opt_tool_test/44.pkl -p opt_tool_test/45.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 4.3 -s opt_tool_test/43.pkl -p opt_tool_test/44.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 4.2 -s opt_tool_test/42.pkl -p opt_tool_test/43.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 4.1 -s opt_tool_test/41.pkl -p opt_tool_test/42.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 4.0 -s opt_tool_test/40.pkl -p opt_tool_test/41.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.9 -s opt_tool_test/39.pkl -p opt_tool_test/40.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.8 -s opt_tool_test/38.pkl -p opt_tool_test/39.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.7 -s opt_tool_test/37.pkl -p opt_tool_test/38.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.6 -s opt_tool_test/36.pkl -p opt_tool_test/37.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.5 -s opt_tool_test/35.pkl -p opt_tool_test/36.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.4 -s opt_tool_test/34.pkl -p opt_tool_test/35.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.3 -s opt_tool_test/33.pkl -p opt_tool_test/34.pkl --basis 3 --reach 2 --push 2 --tool 4
+python main.py -t 3.2 -s opt_tool_test/32.pkl -p opt_tool_test/33.pkl --basis 3 --reach 2 --push 2 --tool 4

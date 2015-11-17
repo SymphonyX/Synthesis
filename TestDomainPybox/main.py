@@ -119,7 +119,6 @@ def error_func(x):
 
     dmps_list = generate_dmps_from_parameters(x, basis, starts, goals, K, D)
 
-    print "Goals ", goals
 
     all_pos = positions_from_dmps(dmps_list)
 
@@ -150,7 +149,7 @@ def error_func(x):
         world.Step(dt, 40, 40)
         world.ClearForces()
         if pd_step == 2000:
-            print "Escaping..." 
+            # print "Escaping..."
             penalty = 10000
             break
 
@@ -199,12 +198,12 @@ def error_func(x):
         best_goals = list(goals_grid)
 
     #print "\nAvg Error: ", (total_error/total_steps)
-    print "\nError: ", error
-    print "X: ", target_x, " Y: ", target_y
-    print "Best Error: ", best_distance
-    print "Obstacle Penalty: ", obstacle_penalty
-    print "Cost: ", cost
-    print "Tool params: ", tool_parameters
+    # print "\nError: ", error
+    # print "X: ", target_x, " Y: ", target_y
+    # print "Best Error: ", best_distance
+    # print "Obstacle Penalty: ", obstacle_penalty
+    # print "Cost: ", cost
+    # print "Tool params: ", tool_parameters
 
     return cost
 
@@ -249,9 +248,9 @@ def seed_parameters(options):
     epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2) )
     epsilons[:] = 10.5
     for i in range(tool_segments):
-        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-        epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
-    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 10.0
+        epsilons[(basis*total_dmps*2)+(2*i)] = 1.0
+        epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.5
+    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 0.1
 
     return params, epsilons
 
@@ -334,10 +333,12 @@ if __name__ == '__main__':
         iterations = 1
         if options.params is not None:
             params, epsilons = seed_parameters(options)
-            iterations = 5
+            iterations = 2
+            outer_iter = 1
 
         elif options.params is None:
             params, epsilons = new_parameters()
+            outer_iter = 3
 
 
         max_vals = [1000.0] * len(goals_grid)
@@ -345,7 +346,7 @@ if __name__ == '__main__':
         num_steps = 2
 
         last_index = len(goals_grid)-1
-        for k in range(3):
+        for k in range(outer_iter):
             j = -1
             while True:
                 j += 1
@@ -356,7 +357,7 @@ if __name__ == '__main__':
                     status_file.write("Outer: " + str(j) + " Inner: " + str(i))
                     status_file.close()
 
-                    result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons)
+                    result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons, maxiter=1)
                     epsilons[:] = epsilons[:] / 10.0
 
                     params = best_params
@@ -378,19 +379,20 @@ if __name__ == '__main__':
                     break
 
 
-            if best_error > 30.0:
-                for index in range(len(goals_grid)):
-                    best_val = best_goals[index]
-                    goals_grid[index] = best_val
-                    step = (max_vals[index] - min_vals[index]) / num_steps
+            for index in range(len(goals_grid)):
+                best_val = best_goals[index]
+                goals_grid[index] = best_val
+                step = (max_vals[index] - min_vals[index]) / num_steps
 
-                    if best_val == min_vals[index]:
-                        max_vals[index] = min_vals[index] + step
-                    elif best_val == max_vals[index]:
-                        min_vals[index] = max_vals[index] - step
-                    else:
-                        max_vals[index] = best_val + (step / 2.0)
-                        min_vals[index] = best_val - (step / 2.0)
+                if best_val == min_vals[index]:
+                    max_vals[index] = min_vals[index] + step
+                elif best_val == max_vals[index]:
+                    min_vals[index] = max_vals[index] - step
+                else:
+                    max_vals[index] = best_val + (step / 2.0)
+                    min_vals[index] = best_val - (step / 2.0)
+
+            print "Best distance: ", best_distance
 
 
 

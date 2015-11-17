@@ -14,8 +14,11 @@ import matplotlib.pyplot as plt
 import pickle
 
 tau = 2.0
-basis = 5
+basis = 3
 tool_segments = 4
+num_reach_dmps = 2
+num_push_dmps = 2
+total_dmps = num_push_dmps + num_reach_dmps
 
 
 width = 1000
@@ -139,10 +142,66 @@ def generate_tool_parameters(params, num_basis, num_segments):
     pi2 = math.pi * 2.0
     tool_parameters = []
     for i in range(num_segments):
-        segment_length = params[num_basis*4+(i*2)] if params[num_basis*4+(i*2)] > 10 else 10
-        segment_angle = params[num_basis*4+(i*2)+1] % pi2
+        segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
+        if segment_length > 200:
+            segment_length = 200
+        segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
         tool_parameters.append( (segment_length, segment_angle) )
+
+    # tool_parameters.append( (100.0, 0.0) )
+    # tool_parameters.append( (50.0, math.pi / 2.0) )
+
     return tool_parameters
+
+def generate_starts_and_goals_lists(goal_params, world):
+
+    goals, starts = [], []
+    for i in range(total_dmps):
+        if i < num_reach_dmps-1:
+            goals.append( goal_params[2*i] )
+            goals.append( goal_params[2*i+1] )
+        elif i == num_reach_dmps-1:
+            goals.append( world.domain_object.body.position[0] )
+            goals.append( world.domain_object.body.position[1] )
+        elif i < total_dmps-1: #Skip the goal of reaching, that's fixed
+            goals.append( goal_params[(2*(i-1))] )
+            goals.append( goal_params[(2*(i-1)+1)] )
+        else:
+            goals.append( world.domain_object.target_position[0] )
+            goals.append( world.domain_object.target_position[1] )
+
+        if i == 0:
+            starts.append( world.arm.pivot_position3[0]+world.arm.tool.length )
+            starts.append( world.arm.pivot_position3[1] )
+        else:
+            starts.append( goals[-4] )
+            starts.append( goals[-3] )
+
+    return starts, goals
+
+
+def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
+
+    dmps_list = []
+    for i in range(len(starts)):
+        dmp = DMP(num_basis, K, D, starts[i], goals[i])
+        for j in range(num_basis):
+            dmp.weights[j] = params[j+(num_basis*i)]
+        dmps_list.append(dmp)
+    return dmps_list
+
+
+def positions_from_dmps(dmp_list):
+    all_pos = [ [], [] ]
+    for i, dmp in enumerate(dmp_list):
+        xpos, xdot, xddot, times = dmp.run_dmp(tau, dmp_dt, dmp.start, dmp.goal)
+        for j in range( len(xpos) ):
+            all_pos[ (i % 2) ].append( xpos[j] )
+
+    all_pos[0].append( dmp_list[-2].goal ) #Append x target position
+    all_pos[1].append( dmp_list[-1].goal ) #Append y target position
+
+    return all_pos
 
 
 if __name__ == "__main__":
@@ -200,52 +259,17 @@ if __name__ == "__main__":
     pygame.init()
     display = pygame.display.set_mode((width, height))
     fpsClock = pygame.time.Clock()
+
+
     tool_parameters = generate_tool_parameters(parameters, basis, tool_segments)
     world = ResetWorld(origin, width, height, x, y, tool_parameters)
 
+    goals_prediction = parameters[-(total_dmps-2)*2:]
+    starts, goals = generate_starts_and_goals_lists(goals_prediction, world)
 
-    dmp1reach = DMP(basis, K, D, world.arm.pivot_position3[0]+world.arm.tool.length, world.domain_object.body.position[0])
-    dmp2reach = DMP(basis, K, D, world.arm.pivot_position3[1], world.domain_object.body.position[1])
+    dmps_list = generate_dmps_from_parameters(parameters, basis, starts, goals, K, D)
 
-    all_pos  = list()
-    for i in range(basis):
-        dmp1reach.weights[i] = parameters[0,i]
-        dmp2reach.weights[i] = parameters[0,i+basis]
-
-    x1, x1dot, x1ddot, t1 = dmp1reach.run_dmp(tau, dmp_dt, dmp1reach.start, dmp1reach.goal)
-    x2, x2dot, x2ddot, t2 = dmp2reach.run_dmp(tau, dmp_dt, dmp2reach.start, dmp2reach.goal)
-    l1, l2 = [], []
-    # x1 = normalize_dmp_pos(x1)
-    for i in range(len(x1)):
-        l1.append( x1[i] )
-    all_pos.append( l1 )
-    # all_pos[0].append(dmp1reach.goal)
-
-    # x2 = normalize_dmp_pos(x2)
-    for i in range(len(x2)):
-        l2.append( x2[i] )
-    all_pos.append( l2 )
-    # all_pos[1].append(dmp2reach.goal)
-
-    dmp1push = DMP(basis, K, D, world.domain_object.body.position[0], world.domain_object.target_position[0])
-    dmp2push = DMP(basis, K, D, world.domain_object.body.position[1], world.domain_object.target_position[1])
-    for i in range(basis):
-        dmp1push.weights[i] = parameters[0,i+(2*basis)]
-        dmp2push.weights[i] = parameters[0,i+(3*basis)]
-
-
-    x1, x1dot, x1ddot, t1 = dmp1push.run_dmp(tau, dmp_dt, dmp1push.start, dmp1push.goal)
-    x2, x2dot, x2ddot, t2 = dmp2push.run_dmp(tau, dmp_dt, dmp2push.start, dmp2push.goal)
-
-    # x1 = normalize_dmp_pos(x1)
-    for i in range(len(x1)):
-        all_pos[0].append( x1[i] )
-    all_pos[0].append(dmp1push.goal)
-
-    # x2 = normalize_dmp_pos(x2)
-    for i in range(len(x2)):
-        all_pos[1].append( x2[i] )
-    all_pos[1].append(dmp2push.goal)
+    all_pos = positions_from_dmps(dmps_list)
 
     RunSimulation(world, all_pos[0], all_pos[1], display, height, x, y, dt, fpsClock, FPS)
 
