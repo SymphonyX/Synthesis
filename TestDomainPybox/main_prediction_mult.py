@@ -81,6 +81,12 @@ def generateTrainingData(filename):
     training_x = np.asarray(data)
     training_y = np.asarray(out)
 
+   ##########XXX HACK ##########
+    training_y[:,-5] = training_y[:,-5] % (2 * math.pi)
+    training_y[:,-7] = training_y[:,-7] % (2 * math.pi)
+    training_y[:,-9] = training_y[:,-9] % (2 * math.pi)
+    training_y[:,-11] = training_y[:,-11] % (2 * math.pi)
+
     training_x, xmin, xmax = normalize_data(training_x)
     training_y, ymin, ymax = normalize_data(training_y)
 
@@ -249,10 +255,11 @@ if __name__ == "__main__":
     feat[0,0] = (x - xmin[0]) / (xmax[0] - xmin[0])
     feat[0,1] = (y - xmin[1]) / (xmax[1] - xmin[1])
 
+    print feat
     for i, network in enumerate(networks):
         new_feat = network.transform_features(feat)
         prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
-        parameters = (prediction * (ymax - ymin)) + ymin
+        parameters = (prediction[0] * (ymax - ymin)) + ymin
 
 
 

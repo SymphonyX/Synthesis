@@ -248,9 +248,9 @@ def seed_parameters(options):
     epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2) )
     epsilons[:] = 10.5
     for i in range(tool_segments):
-        epsilons[(basis*total_dmps*2)+(2*i)] = 1.0
-        epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.5
-    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 0.1
+        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+        epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
+    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 1.0
 
     return params, epsilons
 

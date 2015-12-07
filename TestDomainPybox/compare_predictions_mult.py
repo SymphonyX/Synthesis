@@ -18,7 +18,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print "Arg2: dataset directory"
 
-    f = open("testmul.pkl", "r")
+    f = open("opt_tool_test/pred_mult.pkl", "r")
     data = pickle.load(f)
     networks = data[0]
     xmin = data[1]
@@ -31,6 +31,8 @@ if __name__ == "__main__":
 
     for f in files:
         fi = f.split(".")
+        if len(fi[0]) > 3:
+            continue
         if fi[-1] == "pkl":
             pkls.append(f)
             thetas.append( float(fi[0][0]+"."+fi[0][1]) )
@@ -52,7 +54,7 @@ if __name__ == "__main__":
         for i, network in enumerate(networks):
             new_feat = network.transform_features(feat)
             prediction, expertsPrediction = network.computeMixtureOutput(new_feat)
-            prediction = (prediction * (ymax - ymin)) + ymin
+            prediction = (prediction[0] * (ymax - ymin)) + ymin
             parameters.append( prediction )
 
         t_str = str(theta)
@@ -60,7 +62,9 @@ if __name__ == "__main__":
         t_str = t_str[0] + t_str[1] + ".pkl"
 
         params_file = open(sys.argv[1]+t_str, "r")
-        params = pickle.load(params_file)
+        data = pickle.load(params_file)
+        params = data[0]
+        params.extend( data[1] )
 
         actual_parameters.append( params )
 
@@ -75,8 +79,11 @@ if __name__ == "__main__":
         for p in parameters:
             params.append(p[i])
 
-        plt.plot(thetas, params, label="prediction")
+        plt.plot(thetas, params, "--", label="prediction")
         plt.legend(bbox_to_anchor=(0.8, 1), loc=2, borderaxespad=0.)
+        plt.ylabel("DMP Parameter #2")
+        plt.xlabel("Task (Angle of Target Location)")
+
         plt._show()
 
 

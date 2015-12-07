@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 from mpl_toolkits.mplot3d import Axes3D
 import math
-from viztricks import FigureSaver
+# from viztricks import FigureSaver
 import numpy as np
 from SoftmaxGate import SoftmaxGate
 from GaussianGate import GaussianGate
