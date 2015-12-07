@@ -15,6 +15,7 @@ from domain import ResetWorld
 from domain import SetJointsIteration
 from domain import MoveJointsIteration
 from domain import RunSimulation
+from domain import DistanceToClosestObstacle
 import math
 
 tau = 2.0
@@ -166,12 +167,19 @@ def error_func(x):
             if data1 == "obstacle" or data2 == "obstacle":
                 obstacle_penalty += 10
 
+        min_obstacle_distance = float("inf")
         for body in world.arm.tool.bodies:
-            for edge in body.contacts:
-                data1 = edge.contact.fixtureA.body.userData
-                data2 = edge.contact.fixtureB.body.userData
-                if data1 == "obstacle" or data2 == "obstacle":
-                    obstacle_penalty += 100
+            new_distance = DistanceToClosestObstacle(world, body)
+            if new_distance < min_obstacle_distance:
+                min_obstacle_distance = new_distance
+        obstacle_penalty += 1000 - min_obstacle_distance
+
+        # for body in world.arm.tool.bodies:
+        #     for edge in body.contacts:
+        #         data1 = edge.contact.fixtureA.body.userData
+        #         data2 = edge.contact.fixtureB.body.userData
+        #         if data1 == "obstacle" or data2 == "obstacle":
+        #             obstacle_penalty += 100
 
 
         if object_contact == False:
@@ -197,13 +205,14 @@ def error_func(x):
         best_distance = error
         best_goals = list(goals_grid)
 
-    #print "\nAvg Error: ", (total_error/total_steps)
-    # print "\nError: ", error
+    # print "\nAvg Error: ", (total_error/total_steps)
+    print "\nError: ", error
     # print "X: ", target_x, " Y: ", target_y
-    # print "Best Error: ", best_distance
-    # print "Obstacle Penalty: ", obstacle_penalty
+    print "Best Error: ", best_distance
+    print "Obstacle Penalty: ", obstacle_penalty
     # print "Cost: ", cost
-    # print "Tool params: ", tool_parameters
+    print "Goals: ", goals_grid
+    print "Tool params: ", tool_parameters
 
     return cost
 

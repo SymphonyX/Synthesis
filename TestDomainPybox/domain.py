@@ -45,6 +45,9 @@ class Obstacle:
         #
         #     pygame.draw.polygon(display, (0, 0, 0, 0), vertices)
 
+    def distance_to_object(self, body):
+        return math.sqrt((self.body.position[0] - body.position[0])**2 + (self.body.position[1] - body.position[1])**2)
+
 
 
 class DomainObject:
@@ -80,6 +83,14 @@ class DomainObject:
         pygame.draw.circle(display, self.color, self.position, self.target_radius, 10)
         pygame.draw.circle(display, (0, 255, 0, 0), (int(self.target_position[0]), int(screen_height-self.target_position[1])), 10)
 
+
+def DistanceToClosestObstacle(world, body):
+    min_distance = float("inf")
+    for obstacle in world.obstacles:
+        new_distance = obstacle.distance_to_object(body)
+        if new_distance < min_distance:
+            min_distance = new_distance
+    return min_distance
 
 def ResetWorld(arm_origin, width, height, xpos, ypos, tool_parameters=[ (100.0, 0.0), (50.0, math.pi / 2.0) ]):
     world = b2World(gravity=(0.0,0.0), doSleep=True)
