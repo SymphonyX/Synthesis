@@ -124,11 +124,15 @@ def error_func(x):
     all_pos = positions_from_dmps(dmps_list)
 
     sum_distances = 0
+    initial_distance = math.sqrt((world.arm.end_effector_position()[0] - target_x)**2 + (world.arm.end_effector_position()[0] - target_x)**2)
 
     thetas_reached = True
     pd_step = 0
-    obstacle_penalty = 0.0
-    obj_contact_penalty = 0.0
+    obstacle_penalty, max_obstacle_penalty = 0.0, 0.0
+    obj_contact_penalty, max_obj_contact_penalty = 0.0, 0.0
+
+    arm_contact_cost = 10
+    obj_contact_cost = 100
 
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
@@ -165,34 +169,24 @@ def error_func(x):
             if data1.startswith("tool") or data2.startswith("tool"):
                 object_contact = True
             if data1 == "obstacle" or data2 == "obstacle":
-                obstacle_penalty += 10
+                obstacle_penalty += arm_contact_cost
 
-        min_obstacle_distance = float("inf")
-        for body in world.arm.tool.bodies:
-            new_distance = DistanceToClosestObstacle(world, body)
-            if new_distance < min_obstacle_distance:
-                min_obstacle_distance = new_distance
-        obstacle_penalty += 1000 - min_obstacle_distance
-
-        # for body in world.arm.tool.bodies:
-        #     for edge in body.contacts:
-        #         data1 = edge.contact.fixtureA.body.userData
-        #         data2 = edge.contact.fixtureB.body.userData
-        #         if data1 == "obstacle" or data2 == "obstacle":
-        #             obstacle_penalty += 100
-
+        max_obstacle_penalty += arm_contact_cost
 
         if object_contact == False:
             world.domain_object.body.angularVelocity = 0.0
             world.domain_object.body.linearVelocity = b2Vec2(0,0)
-            obj_contact_penalty += 100.0
+            obj_contact_penalty += obj_contact_cost
+
+        max_obj_contact_penalty += obj_contact_cost
+
 
 
 
     error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
                                    + (world.domain_object.target_position[1] -  world.domain_object.body.position[1])**2)
 
-    cost = (1000 * error)  + obstacle_penalty + obj_contact_penalty + penalty + np.linalg.norm(x[:basis*4]) #+ (10 * sum_distances) #(10 * (total_steps - goal_reach_step))#
+    cost = (error / initial_distance)  + (obstacle_penalty / max_obstacle_penalty) + (obj_contact_penalty / max_obj_contact_penalty) + (sum_distances / initial_distance)
 
     global best_error
     global best_params
@@ -258,7 +252,7 @@ def seed_parameters(options):
     epsilons[:] = 10.5
     for i in range(tool_segments):
         epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-        epsilons[(basis*total_dmps*2)+(2*i+1)] = 1.5
+        epsilons[(basis*total_dmps*2)+(2*i+1)] = 2.5
     epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 1.0
 
     return params, epsilons
