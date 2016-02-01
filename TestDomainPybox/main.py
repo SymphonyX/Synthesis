@@ -20,7 +20,7 @@ import math
 
 tau = 2.0
 basis = 3
-tool_segments = 4
+tool_segments = 2
 
 width = 1000
 height = 1000
@@ -37,8 +37,8 @@ best_distance = float("inf")
 target_x = 0.0
 target_y = 0.0
 
-num_reach_dmps = 2
-num_push_dmps = 2
+num_reach_dmps = 0
+num_push_dmps = 1
 total_dmps = num_push_dmps + num_reach_dmps
 
 goals_grid = [ 0 ] * ((num_reach_dmps-1+num_push_dmps-1) * 2)
@@ -56,17 +56,17 @@ def generate_dmps_from_parameters(params, num_basis, starts, goals, K, D):
 
 
 def generate_tool_parameters(params, num_basis, num_segments):
-    pi2 = math.pi * 2.0
+    # pi2 = math.pi * 2.0
     tool_parameters = []
-    for i in range(num_segments):
-        segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
-        if segment_length > 200:
-            segment_length = 200
-        segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
-        tool_parameters.append( (segment_length, segment_angle) )
+    # for i in range(num_segments):
+    #     segment_length = params[(num_basis*total_dmps*2)+(i*2)] if params[(num_basis*total_dmps*2)+(i*2)] > 50 else 50
+    #     if segment_length > 200:
+    #         segment_length = 200
+    #     segment_angle = 0 if i == 0 else params[(num_basis*total_dmps*2)+(i*2)+1] % pi2
+    #     tool_parameters.append( (segment_length, segment_angle) )
 
-    # tool_parameters.append( (100.0, 0.0) )
-    # tool_parameters.append( (50.0, math.pi / 2.0) )
+    tool_parameters.append( (100.0, 0.0) )
+    tool_parameters.append( (50.0, math.pi / 2.0) )
     
     return tool_parameters
 
@@ -123,16 +123,14 @@ def error_func(x):
 
     all_pos = positions_from_dmps(dmps_list)
 
-    sum_distances = 0
-    initial_distance = math.sqrt((world.arm.end_effector_position()[0] - target_x)**2 + (world.arm.end_effector_position()[0] - target_x)**2)
+    trajectory_length = 0
+    initial_distance = math.sqrt((world.arm.end_effector_position()[0] - all_pos[0][-1])**2 + (world.arm.end_effector_position()[0] - all_pos[1][-1])**2)
 
     thetas_reached = True
     pd_step = 0
     obstacle_penalty, max_obstacle_penalty = 0.0, 0.0
-    obj_contact_penalty, max_obj_contact_penalty = 0.0, 0.0
 
     arm_contact_cost = 10
-    obj_contact_cost = 100
 
     while step < len(all_pos[0]) or thetas_reached == False:
         penalty = 0
@@ -150,6 +148,7 @@ def error_func(x):
         else:
             thetas_reached = MoveJointsIteration(world.arm.joint1, world.arm.joint2, world.arm.joint3)
 
+        world.arm.set_pivot_positions()
         pd_step += 1
         world.Step(dt, 40, 40)
         world.ClearForces()
@@ -160,33 +159,24 @@ def error_func(x):
 
 
         new_pos = world.arm.end_effector_position()
-        sum_distances += math.sqrt( (prev_pos[0] - new_pos[0])**2 + (prev_pos[1] - new_pos[1])**2 )
+        trajectory_length += math.sqrt( (prev_pos[0] - new_pos[0])**2 + (prev_pos[1] - new_pos[1])**2 )
 
-        object_contact = False
-        for edge in world.domain_object.body.contacts:
-            data1 = edge.contact.fixtureA.body.userData
-            data2 = edge.contact.fixtureB.body.userData
-            if data1.startswith("tool") or data2.startswith("tool"):
-                object_contact = True
-            if data1 == "obstacle" or data2 == "obstacle":
-                obstacle_penalty += arm_contact_cost
+        for body in world.arm.tool.bodies:
+            for edge in body.contacts:
+                data1 = edge.contact.fixtureA.body.userData
+                data2 = edge.contact.fixtureB.body.userData
+                
+                if data1 == "obstacle" or data2 == "obstacle":
+                    obstacle_penalty += arm_contact_cost
 
         max_obstacle_penalty += arm_contact_cost
 
-        if object_contact == False:
-            world.domain_object.body.angularVelocity = 0.0
-            world.domain_object.body.linearVelocity = b2Vec2(0,0)
-            obj_contact_penalty += obj_contact_cost
-
-        max_obj_contact_penalty += obj_contact_cost
 
 
-
-
-    error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 \
-                                   + (world.domain_object.target_position[1] -  world.domain_object.body.position[1])**2)
-
-    cost = (error / initial_distance)  + (obstacle_penalty / max_obstacle_penalty) + (obj_contact_penalty / max_obj_contact_penalty) + (sum_distances / initial_distance)
+    end_effector_position = world.arm.end_effector_position()
+    error = math.sqrt( (world.domain_object.target_position[0] - end_effector_position[0])**2 + (world.domain_object.target_position[1] - end_effector_position[1])**2)
+       
+    cost = 10*(error / initial_distance)  + (obstacle_penalty / max_obstacle_penalty) +  ((trajectory_length / initial_distance) - 1)
 
     global best_error
     global best_params
@@ -200,11 +190,11 @@ def error_func(x):
         best_goals = list(goals_grid)
 
     # print "\nAvg Error: ", (total_error/total_steps)
-    print "\nError: ", error
+    print "\nCost: ", cost
+    print "Error: ", error
     # print "X: ", target_x, " Y: ", target_y
     print "Best Error: ", best_distance
     print "Obstacle Penalty: ", obstacle_penalty
-    # print "Cost: ", cost
     print "Goals: ", goals_grid
     print "Tool params: ", tool_parameters
 
@@ -259,19 +249,17 @@ def seed_parameters(options):
 
 
 def new_parameters():
-    params = np.zeros( ((basis*total_dmps*2 )
-                        + tool_segments * 2, 1) )
-    epsilons = np.zeros( ((basis*total_dmps*2 )
-                        + tool_segments * 2) )
+    params = np.zeros( ((basis*total_dmps*2 ), 1) )
+    epsilons = np.zeros( ((basis*total_dmps*2 )) )
     epsilons[:] = 10.0
 
     params[:basis*total_dmps*2] = np.random.uniform(-10, 10)
-    for i in range(tool_segments):
-        params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
-        params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
+    # for i in range(tool_segments):
+    #     params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
+    #     params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
 
-        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-        epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.2
+    #     epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+    #     epsilons[(basis*total_dmps*2)+(2*i+1)] = 0.2
 
     return params, epsilons
 
@@ -364,36 +352,37 @@ if __name__ == '__main__':
                     epsilons[:] = epsilons[:] / 10.0
 
                     params = best_params
+                break
 
-                index = last_index
-                while True:
-                    if goals_grid[index] == max_vals[index]:
-                        goals_grid[index] = min_vals[index]
-                        index -= 1
-                    else:
-                        step = (max_vals[index] - min_vals[index]) / num_steps
-                        goals_grid[index] += step
-                        break
+                # index = last_index
+                # while True:
+                #     if goals_grid[index] == max_vals[index]:
+                #         goals_grid[index] = min_vals[index]
+                #         index -= 1
+                #     else:
+                #         step = (max_vals[index] - min_vals[index]) / num_steps
+                #         goals_grid[index] += step
+                #         break
 
-                    if index == -1:
-                        break
+                #     if index == -1:
+                #         break
 
-                if options.params is not None or index == -1:
-                    break
+                # if options.params is not None or index == -1:
+                #     break
 
 
-            for index in range(len(goals_grid)):
-                best_val = best_goals[index]
-                goals_grid[index] = best_val
-                step = (max_vals[index] - min_vals[index]) / num_steps
+            # for index in range(len(goals_grid)):
+            #     best_val = best_goals[index]
+            #     goals_grid[index] = best_val
+            #     step = (max_vals[index] - min_vals[index]) / num_steps
 
-                if best_val == min_vals[index]:
-                    max_vals[index] = min_vals[index] + step
-                elif best_val == max_vals[index]:
-                    min_vals[index] = max_vals[index] - step
-                else:
-                    max_vals[index] = best_val + (step / 2.0)
-                    min_vals[index] = best_val - (step / 2.0)
+            #     if best_val == min_vals[index]:
+            #         max_vals[index] = min_vals[index] + step
+            #     elif best_val == max_vals[index]:
+            #         min_vals[index] = max_vals[index] - step
+            #     else:
+            #         max_vals[index] = best_val + (step / 2.0)
+            #         min_vals[index] = best_val - (step / 2.0)
 
             print "Best distance: ", best_distance
 
@@ -430,5 +419,7 @@ if __name__ == '__main__':
     dmps_list = generate_dmps_from_parameters(result, basis, starts, goals, K, D)
 
     all_pos = positions_from_dmps(dmps_list)
+
+    pickle.dump(all_pos, open(filename.split(".")[0] + "_waypoints.pkl", "w"))
 
     RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)

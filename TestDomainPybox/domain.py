@@ -60,26 +60,26 @@ class DomainObject:
         self.color = color
         self.radius = radius
 
-        circle = b2CircleShape()
-        circle.radius = 15
-        circle.pos = (0, 0)
-        fixture=b2FixtureDef(
-                        shape=circle,
-                        density=0.1,
-                        friction=0.01,
-                        )
+        # circle = b2CircleShape()
+        # circle.radius = 15
+        # circle.pos = (0, 0)
+        # fixture=b2FixtureDef(
+        #                 shape=circle,
+        #                 density=0.1,
+        #                 friction=0.01,
+        #                 )
 
-        self.body=world.CreateDynamicBody(
-                    position=(position[0], screen_height-position[1]),
-                    fixtures=fixture,
-                )
-        self.body.shape = fixture.shape
-        self.body.userData = "target"
+        # self.body=world.CreateDynamicBody(
+        #             position=(position[0], screen_height-position[1]),
+        #             fixtures=fixture,
+        #         )
+        # self.body.shape = fixture.shape
+        # self.body.userData = "target"
 
     def draw(self, display, screen_height):
         # vertices=[(self.body.transform*v) for v in self.body.shape.vertices]
         # vertices=[(v[0], height-v[1]) for v in vertices]
-        pygame.draw.circle(display, self.color, (int(self.body.position[0]), screen_height-int(self.body.position[1])), 20)
+        # pygame.draw.circle(display, self.color, (int(self.body.position[0]), screen_height-int(self.body.position[1])), 20)
         pygame.draw.circle(display, self.color, self.position, self.target_radius, 10)
         pygame.draw.circle(display, (0, 255, 0, 0), (int(self.target_position[0]), int(screen_height-self.target_position[1])), 10)
 
@@ -235,11 +235,11 @@ def UndesiredContact(world):
         if data1 == "link1" or data1 == "link2" or data2 == "link1" or data2 == "link2":
             return True
 
-    for edge in world.domain_object.body.contacts:
-        data1 = edge.contact.fixtureA.body.userData
-        data2 = edge.contact.fixtureB.body.userData
-        if (data1 != "tool2" and data2 != "tool2") or (data1 != "tool1" and data2 != "tool1"):
-            return True
+    # for edge in world.domain_object.body.contacts:
+    #     data1 = edge.contact.fixtureA.body.userData
+    #     data2 = edge.contact.fixtureB.body.userData
+    #     if (data1 != "tool2" and data2 != "tool2") or (data1 != "tool1" and data2 != "tool1"):
+    #         return True
 
     return False
 
@@ -283,31 +283,22 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
 
 
 
-        error = math.sqrt( (world.domain_object.target_position[0] - world.domain_object.body.position[0])**2 + (world.domain_object.target_position[1] - world.domain_object.body.position[1])**2)
+        end_effector_position = world.arm.end_effector_position()
+        error = math.sqrt( (world.domain_object.target_position[0] - end_effector_position[0])**2 + (world.domain_object.target_position[1] - end_effector_position[1])**2)
         print "Step %d/%d" %(step, len(x1))
         print "Error: ", error
 
         font = pygame.font.SysFont('Arial', 25)
-        # display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
-        # display.blit(font.render('Next Waypoint: (' + str(curx) + "," + str(cury) + ")", True, (0,0,0)), (200, 200))
-        # display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
+        display.blit(font.render('Goal: (' + str(x) + "," + str(y) + ")", True, (0,0,0)), (200, 100))
+        display.blit(font.render('Next Waypoint: (' + str(curx) + "," + str(cury) + ")", True, (0,0,0)), (200, 200))
+        display.blit(font.render("Error: " + str(error), True, (0,0,0)), (200, 150))
 
-        # pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
+        pygame.draw.circle(display, (0, 0, 255), (int(curx), int(height-cury)), 10)
         # pygame.draw.circle(display, (0, 255, 0), (world.arm.end_effector_position()[0], height-world.arm.end_effector_position()[1]), 10)
 
         pygame.display.flip()
 
-        object_contact = False
-        for edge in world.domain_object.body.contacts:
-            data1 = edge.contact.fixtureA.body.userData
-            data2 = edge.contact.fixtureB.body.userData
-            if data1.startswith("tool") or data2.startswith("tool"):
-                object_contact = True
-
-        if object_contact == False:
-            world.domain_object.body.angularVelocity = 0.0
-            world.domain_object.body.linearVelocity = b2Vec2(0,0)
-
+        
 
         if pd_step == 2000:
             print "Escaping..."
