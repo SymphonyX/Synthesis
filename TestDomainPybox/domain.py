@@ -183,10 +183,10 @@ def SetJointsIteration(theta1, theta2, theta3, world):
     if math.fabs(angle3 - theta3) > math.pi:
         theta3 = convert_angle_cw(theta3)
 
-    if theta2 < -math.pi / 1.5:
-        theta2 = -math.pi / 1.5
-    elif theta2 > math.pi / 1.5:
-        theta2 = math.pi / 1.5
+    if theta2 < -math.pi / 1.2:
+        theta2 = -math.pi / 1.2
+    elif theta2 > math.pi / 1.2:
+        theta2 = math.pi / 1.2
 
     PD1.setPoint(theta1)
     PD2.setPoint(theta2)
@@ -250,6 +250,7 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
     step = 0
     pd_step = 0
     curx, cury, error = 0, 0, 0.0
+    all_positions = [[], []] 
     while step < len(x1) or thetas_reached == False:
         display.fill( (255, 255, 255) )
 
@@ -284,6 +285,9 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
 
 
         end_effector_position = world.arm.end_effector_position()
+        all_positions[0].append(end_effector_position[0])
+        all_positions[1].append(end_effector_position[1])
+
         error = math.sqrt( (world.domain_object.target_position[0] - end_effector_position[0])**2 + (world.domain_object.target_position[1] - end_effector_position[1])**2)
         print "Step %d/%d" %(step, len(x1))
         print "Error: ", error
@@ -303,3 +307,4 @@ def RunSimulation(world, x1, x2, display, height, x, y, dt, fpsClock, FPS):
         if pd_step == 2000:
             print "Escaping..."
             break
+    return all_positions

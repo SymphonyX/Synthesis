@@ -38,11 +38,11 @@ class Arm:
         self.pivot1.userData = "pivot1"
 
         self.joint1 = world.CreateRevoluteJoint(bodyA=self.pivot1, bodyB=self.link1.body, anchor=self.pivot1.position, enableMotor=True, maxMotorTorque=1000000000, motorSpeed=0.0)
-        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
+        self.joint2 = world.CreateRevoluteJoint(bodyA=self.link1.body, bodyB=self.link2.body, anchor=self.pivot_position2, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.2, upperAngle=math.pi/1.2)
 
 
         self.tool = Tool(self.pivot_position3[0], self.pivot_position3[1], world, tool_parameters[0][0], body_params=tool_parameters)
-        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.bodies[0], anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/2.0, upperAngle=math.pi/2.0)
+        self.joint3 = world.CreateRevoluteJoint(bodyA=self.link2.body, bodyB=self.tool.bodies[0], anchor=self.pivot_position3, enableMotor=True, maxMotorTorque=100000000, motorSpeed=0.0, enableLimit=True, lowerAngle=-math.pi/1.5, upperAngle=math.pi/1.5)
 
 
     def set_pivot_positions(self):
@@ -120,10 +120,10 @@ class Arm:
             if delta2_direction < 0:
                 delta2 = -delta2
             theta2 += delta2
-            if theta2 > math.pi/2.0:
-                theta2 = math.pi/2.0
-            elif theta2 < -math.pi/2.0:
-                theta2 = -math.pi/2.0
+            if theta2 > math.pi/1.2:
+                theta2 = math.pi/1.2
+            elif theta2 < -math.pi/1.2:
+                theta2 = -math.pi/1.2
 
             p2 = self._compute_position(p1, self.link2.length, theta1+theta2)
             p3 = self._compute_position(p2, self.tool.length, theta1+theta2+theta3)

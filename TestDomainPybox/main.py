@@ -238,12 +238,12 @@ def seed_parameters(options):
     tool_segments = data[4]
     basis = data[5]
 
-    epsilons = np.zeros( (basis*total_dmps*2 + tool_segments*2) )
-    epsilons[:] = 10.5
-    for i in range(tool_segments):
-        epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
-        epsilons[(basis*total_dmps*2)+(2*i+1)] = 2.5
-    epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 1.0
+    epsilons = np.zeros( (basis*total_dmps*2) )
+    epsilons[:] = 1.5
+    # for i in range(tool_segments):
+    #     epsilons[(basis*total_dmps*2)+(2*i)] = 10.0
+    #     epsilons[(basis*total_dmps*2)+(2*i+1)] = 2.5
+    # epsilons[(basis*total_dmps*2)+(2*tool_segments):] = 1.0
 
     return params, epsilons
 
@@ -253,7 +253,7 @@ def new_parameters():
     epsilons = np.zeros( ((basis*total_dmps*2 )) )
     epsilons[:] = 10.0
 
-    params[:basis*total_dmps*2] = np.random.uniform(-10, 10)
+    params[:basis*total_dmps*2] = np.random.uniform(-100, 100)
     # for i in range(tool_segments):
     #     params[(basis*total_dmps*2)+(2*i)] = np.random.uniform(50, 100)
     #     params[(basis*total_dmps*2)+(2*i+1)] = np.random.uniform(-2*math.pi, 2*math.pi)
@@ -329,7 +329,7 @@ if __name__ == '__main__':
 
         elif options.params is None:
             params, epsilons = new_parameters()
-            outer_iter = 3
+            outer_iter = 5
 
 
         max_vals = [1000.0] * len(goals_grid)
@@ -338,21 +338,20 @@ if __name__ == '__main__':
 
         last_index = len(goals_grid)-1
         for k in range(outer_iter):
-            j = -1
-            while True:
-                j += 1
+            # j = -1
+            # while True:
+                # j += 1
 
-                for i in range(iterations):
-                    status_file = open("status.txt", "w")
-                    status_file.write("Theta: " + str(options.theta) )
-                    status_file.write("Outer: " + str(j) + " Inner: " + str(i))
-                    status_file.close()
+            for i in range(iterations):
+                status_file = open("status.txt", "w")
+                status_file.write("Theta: " + str(options.theta) )
+                status_file.write("Outer: " + str(k) + " Inner: " + str(i))
+                status_file.close()
 
-                    result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons, maxiter=1)
-                    epsilons[:] = epsilons[:] / 10.0
+                result = optimize.fmin_bfgs(f=error_func, x0=[ params ], epsilon=epsilons, maxiter=1)
+                epsilons[:] = epsilons[:] / 10.0
 
-                    params = best_params
-                break
+                params = best_params
 
                 # index = last_index
                 # while True:
@@ -420,6 +419,8 @@ if __name__ == '__main__':
 
     all_pos = positions_from_dmps(dmps_list)
 
-    pickle.dump(all_pos, open(filename.split(".")[0] + "_waypoints.pkl", "w"))
+    positions_followed = RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)
 
-    RunSimulation(world, all_pos[0], all_pos[1], display, height, target_x, target_y, dt, fpsClock, FPS)
+    if options.load is None and options.save is not None:
+        pickle.dump(all_pos, open(filename.split(".")[0] + "_waypoints.pkl", "w"))
+        pickle.dump(positions_followed, open(filename.split(".")[0] + "_trajectory.pkl", "w"))
